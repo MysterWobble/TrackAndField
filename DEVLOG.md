@@ -42,7 +42,16 @@ Short entries, every session. This becomes the portfolio and essay material.
 - **Step 3, Determination (built by Claude):** below 25% stamina, roll every 5 s; success gives 5 + Determination/10 stamina, max once per lap. After getting stamina back, the runner speeds back up at their Kick rate.
 - **Playtest finding:** with 15+ Determination, sprinting lap 1 at top speed matches or beats even pace (Det 35: 6:38.9 vs 6:51.0), because each recovery pushes the fade later. Decide whether that's a feature (a risky strategy for gritty runners) or needs tuning.
 - **Step 4, live race (built by Claude):** the race plays out in the terminal about 7× faster than real life, and K turns the kick on and off. Kick turns itself off when stamina runs out. On Windows, commands use `npm.cmd` because PowerShell blocks `npm`.
-**Next:** Step 5 (the 4 running styles). Revisit the sprint-vs-even-pace balance once Front Runners exist.
+- **Running style rules (for the styles step):**
+  - *Front Runner:* lap 1 runs halfway between average and top speed (costs stamina). Higher Race IQ makes that opening surge smaller. When passed, tries to take the lead back; high Race IQ makes them more likely to let it go.
+  - *Pacer:* 10% less stamina drain at normal pace, always-steady laps, kick 25% weaker.
+  - *Closer:* runs about 95% of normal pace early to save stamina, then gets +10% top speed on the last lap.
+  - *Competitor:* +5% speed within 10 m behind someone; −5% speed when leading or 20+ m from everyone.
+  - *Computer runners* each kick once on the last lap. Better stats mean a better kick.
+- **Build order change:** the full field of 8 comes before running styles, because 3 of the 4 styles react to other runners.
+- **Full field of 8 (built by Claude):** 7 computer runners scaled to you (1–2 have 5–15 more stat points, the rest 0–20 fewer), names from `data/names.js`. Passing is announced, drafting within 2 m saves 3% stamina, and computer runners kick once on the last lap, timed by how much stamina they have left (Race IQ makes the timing more accurate).
+- **Playtest finding:** seed 12345 without kicking finishes 5th. Kicking with 270 m left wins. The timing of your kick already decides races.
+**Next:** Running styles (rules above), then race conditions. Runners with the same pace currently run side by side; styles and Race IQ should spread them out.
 
 ---
 

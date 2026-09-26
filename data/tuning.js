@@ -40,6 +40,20 @@ export const tuning = {
   determinationBonusPerPoint: 0.1, // ...plus this much per Determination point (30 points -> +8 total)
   // (chance of success = Determination points as a percent; 30 points = 30%. Max one success per lap.)
 
+  // --- The field (computer runners) ---
+  computerRunners: 7,
+  strongerRunnersMin: 1, // 1 or 2 computer runners always have MORE stat points than you...
+  strongerRunnersMax: 2,
+  strongerExtraPoints: [5, 15], // ...this many more (random in this range)
+  weakerFewerPoints: [0, 20], // everyone else has this many FEWER points than you
+  computerKickMisjudge: 0.6, // a Race IQ 0 runner can start their kick up to 60% too early or too late
+  perfectKickRaceIQ: 50, // at this much Race IQ, a computer runner times its kick perfectly
+
+  // --- Racing together ---
+  draftingRangeMeters: 2, // running this close behind someone...
+  draftingStaminaSaving: 0.03, // ...saves this much stamina (3%)
+  ignorePassesFirstMeters: 100, // don't announce passes while the pack sorts itself out at the start
+
   // --- Simulation ---
   tickSeconds: 0.1, // the sim moves everyone forward in steps this long
   liveSpeedup: 7, // the live race plays this many times faster than real life (a 1:40 lap takes ~14 seconds)

@@ -14,9 +14,15 @@ export const STAT_LABELS = {
   raceIQ: "Race IQ",
 };
 
+export function totalPoints(points) {
+  return STAT_NAMES.reduce((sum, stat) => sum + points[stat], 0);
+}
+
 // Hands out the stat points at random. Each stat gets a random "lean" first, so runners
 // have personalities (one might be all Stamina, another all Kick) instead of all being ~25s.
-export function randomStatPoints(rng) {
+export function randomStatPoints(rng, total = tuning.statPointsTotal) {
+  // The per-stat limit grows if a runner ever has too many points to fit under it.
+  const maxPerStat = Math.max(tuning.maxPointsPerStat, Math.ceil(total / STAT_NAMES.length));
   const points = {};
   const lean = {};
   for (const stat of STAT_NAMES) {
@@ -24,8 +30,8 @@ export function randomStatPoints(rng) {
     lean[stat] = rng.range(0.3, 1.7);
   }
 
-  for (let i = 0; i < tuning.statPointsTotal; i++) {
-    const open = STAT_NAMES.filter((stat) => points[stat] < tuning.maxPointsPerStat);
+  for (let i = 0; i < total; i++) {
+    const open = STAT_NAMES.filter((stat) => points[stat] < maxPerStat);
     const totalLean = open.reduce((sum, stat) => sum + lean[stat], 0);
     let roll = rng.range(0, totalLean);
     let chosen = open[open.length - 1];
@@ -60,5 +66,6 @@ export function buildRunner(name, points) {
     drainPerLap: tuning.drainPerLapAtAveragePace + points.stamina * tuning.extraDrainPerLapPerStaminaPoint,
     kick: tuning.baseKick + points.kick * tuning.kickPerPoint, // mph gained per second when pushing
     determination: points.determination, // % chance to recover stamina when running low
+    raceIQ: points.raceIQ, // how smart the runner races (kick timing for now; positioning later)
   };
 }
