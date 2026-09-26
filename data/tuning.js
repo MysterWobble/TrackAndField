@@ -33,6 +33,14 @@ export const tuning = {
   exhaustedSlowdownPerSecond: 0.1, // lose 10% of average pace speed every second...
   exhaustedFloor: 0.5, // ...until you're down to 50% of it
 
+  // --- Determination ---
+  determinationLowStamina: 0.25, // start rolling when stamina drops below 25% of the tank
+  determinationRollEverySeconds: 5, // roll again this often while still low
+  determinationBaseBonus: 5, // a successful roll gives this much stamina...
+  determinationBonusPerPoint: 0.1, // ...plus this much per Determination point (30 points -> +8 total)
+  // (chance of success = Determination points as a percent; 30 points = 30%. Max one success per lap.)
+
   // --- Simulation ---
   tickSeconds: 0.1, // the sim moves everyone forward in steps this long
+  liveSpeedup: 7, // the live race plays this many times faster than real life (a 1:40 lap takes ~14 seconds)
 };

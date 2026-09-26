@@ -59,5 +59,6 @@ export function buildRunner(name, points) {
     maxStamina: tuning.baseStamina + points.stamina * tuning.staminaPerPoint,
     drainPerLap: tuning.drainPerLapAtAveragePace + points.stamina * tuning.extraDrainPerLapPerStaminaPoint,
     kick: tuning.baseKick + points.kick * tuning.kickPerPoint, // mph gained per second when pushing
+    determination: points.determination, // % chance to recover stamina when running low
   };
 }

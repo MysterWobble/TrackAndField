@@ -4,11 +4,17 @@
 //   1. decides how fast the runner wants to go,
 //   2. speeds them up or slows them down toward that,
 //   3. moves them forward and takes away stamina,
-//   4. writes down a split whenever they cross a lap line.
+//   4. rolls for Determination if stamina is low,
+//   5. writes down a split whenever they cross a lap line.
+//
+// createRace() makes a race you can step through one tick at a time (the live view does this,
+// so it can draw the screen and listen for the K key between ticks).
+// runSolo() just steps all the way to the finish instantly.
 
 import { tuning } from "../data/tuning.js";
 import { mphToMetersPerSecond, raceMeters } from "./units.js";
 import { staminaUsed } from "./stamina.js";
+import { rollDetermination } from "./determination.js";
 
 // A pace plan says how hard to run each lap: 0 = average pace, 1 = top speed, 0.5 = halfway between.
 export const PLANS = {
@@ -16,68 +22,124 @@ export const PLANS = {
   fastStart: { label: "sprint lap 1 at top speed", effort: [1, 0, 0, 0] },
 };
 
-export function runSolo(runner, plan = PLANS.even) {
+export function createRace(runner, rng, plan = PLANS.even) {
   const dt = tuning.tickSeconds;
   const finishLine = raceMeters();
 
-  let time = 0;
-  let distance = 0;
-  let speed = 0; // standing start
-  let stamina = runner.maxStamina;
-  let ranOutAt = null; // meters where stamina first hit 0
-  const laps = [];
+  let reachedPace = false; // true once the runner first gets up to average pace
+  let nextRollIn = 0; // seconds until the next Determination roll
+  let lastSuccessLap = null; // Determination can only succeed once per lap
 
-  while (distance < finishLine) {
-    const lapIndex = Math.min(Math.floor(distance / tuning.lapMeters), tuning.laps - 1);
+  const race = {
+    runner,
+    plan,
+    time: 0,
+    distance: 0,
+    speed: 0, // standing start
+    stamina: runner.maxStamina,
+    kicking: false, // true while the player has kick turned on
+    finished: false,
+    ranOutAt: null, // meters where stamina first hit 0
+    laps: [],
+    events: [], // Determination successes, for printing
 
-    // 1. How fast does the runner want to go?
-    const effort = plan.effort[lapIndex];
-    const targetSpeed = runner.averageSpeed + effort * (runner.topSpeed - runner.averageSpeed);
+    lapIndex() {
+      return Math.min(Math.floor(race.distance / tuning.lapMeters), tuning.laps - 1);
+    },
 
-    // 2. Speed up or slow down.
-    if (stamina <= 0) {
-      // Out of stamina: fade by 10% of average speed per second, down to 50%.
-      const floor = tuning.exhaustedFloor * runner.averageSpeed;
-      speed = Math.max(speed - tuning.exhaustedSlowdownPerSecond * runner.averageSpeed * dt, floor);
-    } else if (speed < targetSpeed) {
-      // Getting up to average pace is quick for everyone. Going past it is what Kick controls.
-      const rate = speed < runner.averageSpeed ? tuning.startAcceleration : runner.kick;
-      speed = Math.min(speed + rate * dt, targetSpeed);
-    } else if (speed > targetSpeed) {
-      speed = Math.max(speed - tuning.easeOffRate * dt, targetSpeed);
-    }
+    step() {
+      if (race.finished) return;
+      const lapIndex = race.lapIndex();
 
-    // 3. Move forward and use stamina.
-    let meters = mphToMetersPerSecond(speed) * dt;
-    let tickTime = dt;
-    if (distance + meters >= finishLine) {
-      // Only count the part of this tick it took to reach the line, so times aren't rounded to 0.1s.
-      const fraction = (finishLine - distance) / meters;
-      meters *= fraction;
-      tickTime *= fraction;
-    }
+      // 1. How fast does the runner want to go? Kicking means "go for top speed".
+      const effort = race.kicking ? 1 : plan.effort[lapIndex];
+      const targetSpeed = runner.averageSpeed + effort * (runner.topSpeed - runner.averageSpeed);
 
-    const lapLineAhead = (lapIndex + 1) * tuning.lapMeters;
-    const crossesLapLine = distance < lapLineAhead && distance + meters >= lapLineAhead;
-    const timeAtLapLine = time + tickTime * ((lapLineAhead - distance) / meters);
+      // 2. Speed up or slow down.
+      if (race.stamina <= 0) {
+        // Out of stamina: fade by 10% of average speed per second, down to 50%.
+        const floor = tuning.exhaustedFloor * runner.averageSpeed;
+        race.speed = Math.max(race.speed - tuning.exhaustedSlowdownPerSecond * runner.averageSpeed * dt, floor);
+      } else if (race.speed < targetSpeed) {
+        // Leaving the start line is quick for everyone. After that, all speeding up
+        // (a kick, or recovering after running out of stamina) happens at the Kick rate.
+        const rate = reachedPace ? runner.kick : tuning.startAcceleration;
+        race.speed = Math.min(race.speed + rate * dt, targetSpeed);
+      } else if (race.speed > targetSpeed) {
+        race.speed = Math.max(race.speed - tuning.easeOffRate * dt, targetSpeed);
+      }
+      if (race.speed >= runner.averageSpeed) reachedPace = true;
 
-    stamina -= staminaUsed(runner, speed, meters);
-    if (stamina <= 0 && ranOutAt === null) ranOutAt = distance + meters;
-    stamina = Math.max(stamina, 0);
-    distance += meters;
-    time += tickTime;
+      // 3. Move forward and use stamina.
+      let meters = mphToMetersPerSecond(race.speed) * dt;
+      let tickTime = dt;
+      if (race.distance + meters >= finishLine) {
+        // Only count the part of this tick it took to reach the line, so times aren't rounded to 0.1s.
+        const fraction = (finishLine - race.distance) / meters;
+        meters *= fraction;
+        tickTime *= fraction;
+      }
 
-    // 4. Record a split at each lap line.
-    if (crossesLapLine) {
-      const previousSplit = laps.length ? laps[laps.length - 1].split : 0;
-      laps.push({
-        lap: lapIndex + 1,
-        split: timeAtLapLine, // total race time so far
-        lapTime: timeAtLapLine - previousSplit,
-        staminaLeft: stamina,
-      });
-    }
-  }
+      const lapLineAhead = (lapIndex + 1) * tuning.lapMeters;
+      const crossesLapLine = race.distance < lapLineAhead && race.distance + meters >= lapLineAhead;
+      const timeAtLapLine = race.time + tickTime * ((lapLineAhead - race.distance) / meters);
 
-  return { finishTime: time, laps, ranOutAt, staminaLeft: stamina };
+      race.stamina -= staminaUsed(runner, race.speed, meters);
+      if (race.stamina <= 0) {
+        if (race.ranOutAt === null) race.ranOutAt = race.distance + meters;
+        race.kicking = false; // too tired to keep kicking
+      }
+      race.stamina = Math.max(race.stamina, 0);
+      race.distance += meters;
+      race.time += tickTime;
+
+      // 4. Determination: while stamina is low, roll every few seconds (max one success per lap).
+      const lowStamina = race.stamina < tuning.determinationLowStamina * runner.maxStamina;
+      if (!lowStamina) {
+        nextRollIn = 0; // roll straight away the next time stamina drops low
+      } else {
+        nextRollIn -= tickTime;
+        if (nextRollIn <= 0 && lastSuccessLap !== lapIndex) {
+          nextRollIn = tuning.determinationRollEverySeconds;
+          const bonus = rollDetermination(runner, rng);
+          if (bonus > 0) {
+            race.stamina = Math.min(race.stamina + bonus, runner.maxStamina);
+            lastSuccessLap = lapIndex;
+            race.events.push({ type: "determination", time: race.time, distance: race.distance, lap: lapIndex + 1, bonus });
+          }
+        }
+      }
+
+      // 5. Record a split at each lap line.
+      if (crossesLapLine) {
+        const previousSplit = race.laps.length ? race.laps[race.laps.length - 1].split : 0;
+        race.laps.push({
+          lap: lapIndex + 1,
+          split: timeAtLapLine, // total race time so far
+          lapTime: timeAtLapLine - previousSplit,
+          staminaLeft: race.stamina,
+        });
+      }
+
+      if (race.distance >= finishLine) race.finished = true;
+    },
+
+    result() {
+      return {
+        finishTime: race.time,
+        laps: race.laps,
+        ranOutAt: race.ranOutAt,
+        staminaLeft: race.stamina,
+        events: race.events,
+      };
+    },
+  };
+
+  return race;
+}
+
+export function runSolo(runner, rng, plan = PLANS.even) {
+  const race = createRace(runner, rng, plan);
+  while (!race.finished) race.step();
+  return race.result();
 }

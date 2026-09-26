@@ -39,7 +39,10 @@ Short entries, every session. This becomes the portfolio and essay material.
 - **Kick button in the terminal:** press K to start kicking, K again to stop. Running styles still do their own surges automatically.
 - All race numbers live in `data/tuning.js` so we can tune without touching the code.
 **What I learned:** A "seed" makes random numbers repeatable, so the same seed always gives the same race. The sim runs like a flip-book: every 0.1 seconds it moves each runner forward a bit and takes away some stamina.
-**Next:** Step 3 (Determination rolls to recover from running out of stamina).
+- **Step 3, Determination (built by Claude):** below 25% stamina, roll every 5 s; success gives 5 + Determination/10 stamina, max once per lap. After getting stamina back, the runner speeds back up at their Kick rate.
+- **Playtest finding:** with 15+ Determination, sprinting lap 1 at top speed matches or beats even pace (Det 35: 6:38.9 vs 6:51.0), because each recovery pushes the fade later. Decide whether that's a feature (a risky strategy for gritty runners) or needs tuning.
+- **Step 4, live race (built by Claude):** the race plays out in the terminal about 7× faster than real life, and K turns the kick on and off. Kick turns itself off when stamina runs out. On Windows, commands use `npm.cmd` because PowerShell blocks `npm`.
+**Next:** Step 5 (the 4 running styles). Revisit the sprint-vs-even-pace balance once Front Runners exist.
 
 ---
 
