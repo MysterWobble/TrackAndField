@@ -51,7 +51,11 @@ Short entries, every session. This becomes the portfolio and essay material.
 - **Build order change:** the full field of 8 comes before running styles, because 3 of the 4 styles react to other runners.
 - **Full field of 8 (built by Claude):** 7 computer runners scaled to you (1–2 have 5–15 more stat points, the rest 0–20 fewer), names from `data/names.js`. Passing is announced, drafting within 2 m saves 3% stamina, and computer runners kick once on the last lap, timed by how much stamina they have left (Race IQ makes the timing more accurate).
 - **Playtest finding:** seed 12345 without kicking finishes 5th. Kicking with 270 m left wins. The timing of your kick already decides races.
-**Next:** Running styles (rules above), then race conditions. Runners with the same pace currently run side by side; styles and Race IQ should spread them out.
+- **Running styles + picking 1 of 3 runners (built by Claude):** your 3 runners each have a different style, and you pick one before the race. Style numbers live in `data/styles.js`. Style speed bonuses don't cost extra stamina; pace changes (hanging back, surging) do.
+- **Bug found by simulation:** two Competitors kept leapfrogging each other (1,283 passes per race). Fix: within 2 m of someone, a Competitor tucks in and runs normally. The "leading" penalty only applies once 2 m clear. Now about 16 passes per race.
+- **Balance finding (300 simulated races, computer runners):** Front Runner avg 3.2nd place (26% wins), Pacer 3.9 (17%), Competitor 4.0 (10%), Closer 5.8 (3%). Closers lose about 16 s hanging back but only save enough stamina for about 45 m more sprinting. Best option tested: 97% early pace + 20% top speed (Closer 4.7, 12% wins).
+- **Decision:** Closers now run 97% pace early and get +20% top speed on the last lap (option D), because it was the most balanced option while keeping the "hang back, then explode" feel.
+**Next:** Race conditions (shown before you pick your runner).
 
 ---
 

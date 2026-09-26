@@ -1,6 +1,7 @@
 // A runner = 150 stat points, turned into real numbers the race can use.
 
 import { tuning } from "../data/tuning.js";
+import { STYLES } from "../data/styles.js";
 import { paceToMph } from "./units.js";
 
 export const STAT_NAMES = ["speed", "topSpeed", "stamina", "kick", "determination", "raceIQ"];
@@ -48,7 +49,9 @@ export function randomStatPoints(rng, total = tuning.statPointsTotal) {
 }
 
 // Turns stat points into what the race actually uses.
-export function buildRunner(name, points) {
+// `style` is a key from data/styles.js ("closer", "pacer", ...) or null for no style (used in tests).
+export function buildRunner(name, points, style = null) {
+  const kickMultiplier = style === "pacer" ? STYLES.pacer.kickMultiplier : 1;
   const averagePace = tuning.zeroPointAveragePace - points.speed * tuning.secondsPerSpeedPoint;
   const topSpeedPace =
     tuning.zeroPointTopSpeedPace -
@@ -58,13 +61,14 @@ export function buildRunner(name, points) {
   return {
     name,
     points,
+    style,
     averagePace, // seconds to run 1600 m at average pace
     topSpeedPace, // seconds to run 1600 m at top speed (if you somehow never got tired)
     averageSpeed: paceToMph(averagePace), // mph
     topSpeed: paceToMph(topSpeedPace), // mph
     maxStamina: tuning.baseStamina + points.stamina * tuning.staminaPerPoint,
     drainPerLap: tuning.drainPerLapAtAveragePace + points.stamina * tuning.extraDrainPerLapPerStaminaPoint,
-    kick: tuning.baseKick + points.kick * tuning.kickPerPoint, // mph gained per second when pushing
+    kick: (tuning.baseKick + points.kick * tuning.kickPerPoint) * kickMultiplier, // mph gained per second when pushing
     determination: points.determination, // % chance to recover stamina when running low
     raceIQ: points.raceIQ, // how smart the runner races (kick timing for now; positioning later)
   };

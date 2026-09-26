@@ -76,6 +76,8 @@ export function runLive(race) {
         lastPassAnnounced.set(rival, event.time);
         const place = ordinal(race.positionOf(you));
         say(mine ? `  You pass ${rival.runner.name}! Now ${place}.` : `  ${name} passes you. Now ${place}.`);
+      } else if (event.type === "chase" && (mine || event.target === you)) {
+        say(mine ? "  Your Front Runner fights to get the position back!" : `  ${name} fights back!`);
       } else if (event.type === "kick") {
         say(`  ${name} starts kicking!`);
       } else if (event.type === "ranOut") {

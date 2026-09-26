@@ -1,25 +1,28 @@
 // Entry point for `npm.cmd run race`.
 //
-//   npm.cmd run race                       -> random runner, race plays live (press K to kick)
+//   npm.cmd run race                       -> pick 1 of your 3 runners, race plays live (press K to kick)
 //   npm.cmd run race -- 12345              -> replay seed 12345
+//   npm.cmd run race -- 12345 --runner 2   -> skip the question and race with runner 2
 //   npm.cmd run race -- 12345 --instant    -> skip the live view, just print the results
-//   npm.cmd run race -- 12345 --fast-start -> your runner plans to sprint lap 1
+//   npm.cmd run race -- 12345 --fast-start -> your runner also sprints lap 1 (for testing)
 //   npm.cmd run race -- 12345 --det 0      -> set your Determination to 0 (for testing)
 //   npm.cmd run race -- 12345 --solo       -> race alone, no computer runners
 //
-// So far: you + 7 computer runners. No cards, styles, or race conditions yet.
+// So far: your 3 runners with running styles + 7 computer runners. No cards or race conditions yet.
 
+import readline from "node:readline/promises";
 import { createRandom, newSeed } from "./random.js";
-import { buildRunner, randomStatPoints, totalPoints, STAT_NAMES, STAT_LABELS } from "./runner.js";
-import { makeField } from "./field.js";
+import { buildRunner, totalPoints, STAT_NAMES, STAT_LABELS } from "./runner.js";
+import { makeField, makeYourRunners } from "./field.js";
 import { createRace, PLANS } from "./race.js";
 import { runLive } from "./live.js";
 import { formatTime, ordinal } from "./units.js";
-import { determinationBonus } from "./determination.js";
+import { STYLES } from "../data/styles.js";
 import { tuning } from "../data/tuning.js";
 
 let seedArg;
 let detArg;
+let runnerArg;
 let instant = false;
 let solo = false;
 let plan = PLANS.even;
@@ -29,6 +32,7 @@ for (let i = 0; i < args.length; i++) {
   else if (args[i] === "--instant") instant = true;
   else if (args[i] === "--solo") solo = true;
   else if (args[i] === "--det") detArg = args[++i];
+  else if (args[i] === "--runner") runnerArg = args[++i];
   else seedArg = args[i];
 }
 
@@ -41,35 +45,47 @@ if (detArg !== undefined && !(Number(detArg) >= 0)) {
   console.log("--det needs a number 0 or higher, like: npm.cmd run race -- 12345 --det 30");
   process.exit(1);
 }
+if (runnerArg !== undefined && !["1", "2", "3"].includes(runnerArg)) {
+  console.log("--runner needs 1, 2 or 3, like: npm.cmd run race -- 12345 --runner 2");
+  process.exit(1);
+}
 
+const hasKeyboard = Boolean(process.stdin.isTTY);
 const rng = createRandom(seed);
-const points = randomStatPoints(rng);
-if (detArg !== undefined) points.determination = Number(detArg);
-const runner = buildRunner("You", points);
-const rivals = solo ? [] : makeField(points, rng);
-const race = createRace(runner, rivals, rng, plan);
+const yourRunners = makeYourRunners(rng);
 
 console.log(`Seed: ${seed}\n`);
-console.log("YOUR RUNNER");
-console.log("  " + STAT_NAMES.map((stat) => `${STAT_LABELS[stat]} ${runner.points[stat]}`).join(" · "));
-console.log(`  Average pace   ${formatTime(runner.averagePace)}  (${runner.averageSpeed.toFixed(2)} mph)`);
-console.log(`  Top speed pace ${formatTime(runner.topSpeedPace)}  (${runner.topSpeed.toFixed(2)} mph)`);
-console.log(`  Stamina ${runner.maxStamina}, uses ${runner.drainPerLap.toFixed(1)} per lap at average pace`);
-console.log(`  Kick ${runner.kick.toFixed(2)} mph per second`);
-console.log(`  Determination: ${runner.determination}% chance per roll, +${determinationBonus(runner).toFixed(1)} stamina`);
+console.log("YOUR RUNNERS");
+yourRunners.forEach((r, i) => {
+  console.log(`  ${i + 1}. ${STYLES[r.style].name.toUpperCase()}`);
+  console.log("     " + STAT_NAMES.map((stat) => `${STAT_LABELS[stat]} ${r.points[stat]}`).join(" · "));
+  console.log(
+    `     Average ${formatTime(r.averagePace)} · Top speed ${formatTime(r.topSpeedPace)} · Stamina ${r.maxStamina} · Kick ${r.kick.toFixed(2)} mph/s`,
+  );
+  console.log(`     ${STYLES[r.style].description}\n`);
+});
+
+const choice = await chooseRunner();
+let runner = yourRunners[choice - 1];
+if (detArg !== undefined) runner = buildRunner("You", { ...runner.points, determination: Number(detArg) }, runner.style);
+console.log(`You picked runner ${choice}: the ${STYLES[runner.style].name}.`);
+
+const rivals = solo ? [] : makeField(runner.points, rng);
+const race = createRace(runner, rivals, rng, plan);
 
 if (rivals.length) {
-  console.log("\nTHE FIELD (stat points · average pace)");
-  console.log(`  ${"You".padEnd(8)} ${totalPoints(points)} pts · ${formatTime(runner.averagePace)}`);
-  for (const rival of rivals) {
-    console.log(`  ${rival.name.padEnd(8)} ${totalPoints(rival.points)} pts · ${formatTime(rival.averagePace)}`);
+  console.log("\nTHE FIELD (style · stat points · average pace)");
+  for (const r of [runner, ...rivals]) {
+    console.log(
+      `  ${r.name.padEnd(8)} ${STYLES[r.style].name.padEnd(13)} ${totalPoints(r.points)} pts · ${formatTime(r.averagePace)}`,
+    );
   }
 }
 
-console.log(`\nRACE (your plan: ${plan.label})`);
+console.log(`\nRACE${plan === PLANS.even ? "" : ` (your plan: ${plan.label})`}`);
 
 // The live view needs a real terminal to read key presses. If there isn't one, fall back to instant.
-if (!instant && !process.stdin.isTTY) {
+if (!instant && !hasKeyboard) {
   console.log("  (No keyboard available here, so showing instant results instead.)");
   instant = true;
 }
@@ -81,6 +97,21 @@ if (instant) {
 } else {
   const { finished } = await runLive(race);
   if (finished) printResults();
+}
+
+async function chooseRunner() {
+  if (runnerArg !== undefined) return Number(runnerArg);
+  if (!hasKeyboard) {
+    console.log("(No keyboard available here, so picking runner 1. Use --runner 2 to pick another.)");
+    return 1;
+  }
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  let answer;
+  while (!["1", "2", "3"].includes(answer)) {
+    answer = (await rl.question("Pick your runner (1, 2 or 3): ")).trim();
+  }
+  rl.close();
+  return Number(answer);
 }
 
 function printYourRace() {
@@ -112,6 +143,8 @@ function printResults() {
   for (const r of results) {
     const gap = r.place === 1 ? "" : `+${(r.finishTime - winnerTime).toFixed(1)}`;
     const marker = r.isPlayer ? "  <-- you" : "";
-    console.log(`  ${ordinal(r.place).padEnd(4)} ${r.name.padEnd(8)} ${formatTime(r.finishTime)}  ${gap.padStart(6)}${marker}`);
+    console.log(
+      `  ${ordinal(r.place).padEnd(4)} ${r.name.padEnd(8)} ${STYLES[r.style].name.padEnd(13)} ${formatTime(r.finishTime)}  ${gap.padStart(6)}${marker}`,
+    );
   }
 }

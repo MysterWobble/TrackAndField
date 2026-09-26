@@ -1,7 +1,7 @@
 // The race loop: you plus the computer runners, all on the track together.
 //
 // The sim works like a flip-book. Every tick (0.1 seconds), for each runner, it:
-//   1. decides how fast they want to go (computer runners decide here when to kick),
+//   1. decides how fast they want to go (running style, kicking, Front Runners fighting back),
 //   2. speeds them up or slows them down toward that,
 //   3. moves them forward and takes away stamina (a little less if drafting),
 //   4. rolls for Determination if stamina is low,
@@ -16,6 +16,8 @@ import { tuning } from "../data/tuning.js";
 import { mphToMetersPerSecond, raceMeters } from "./units.js";
 import { staminaUsed } from "./stamina.js";
 import { rollDetermination } from "./determination.js";
+import { planFor, speedBonuses, staminaFactor, wantsToChase, CHASE } from "./styles.js";
+import { STYLES } from "../data/styles.js";
 
 // A pace plan says how hard to run each lap: 0 = average pace, 1 = top speed, 0.5 = halfway between.
 export const PLANS = {
@@ -42,6 +44,7 @@ function createEntrant(runner, isPlayer, plan, rng) {
     stamina: runner.maxStamina,
     kicking: false,
     hasKicked: false, // computer runners only kick once
+    chasing: null, // a Front Runner fighting to get a position back: { target, until }
     kickTiming: isPlayer ? 0 : rng.range(-1, 1) * kickMisjudge(runner), // + means they'll go too early
     reachedPace: false, // true once they first get up to average pace
     nextRollIn: 0, // seconds until the next Determination roll
@@ -81,6 +84,16 @@ export function createRace(player, rivals, rng, plan = PLANS.even) {
     return gap;
   }
 
+  // Meters to the nearest runner behind.
+  function gapBehind(index, startDistances) {
+    let gap = null;
+    startDistances.forEach((distance, j) => {
+      const behind = startDistances[index] - distance;
+      if (j !== index && entrants[j].finishTime === null && behind >= 0 && (gap === null || behind < gap)) gap = behind;
+    });
+    return gap;
+  }
+
   function moveEntrant(e, index, startDistances) {
     const runner = e.runner;
     const lapIndex = lapOf(e.distance);
@@ -96,8 +109,25 @@ export function createRace(player, rivals, rng, plan = PLANS.even) {
         race.log.push({ type: "kick", entrant: e, distance: e.distance, time: race.time });
       }
     }
-    const effort = e.kicking ? 1 : e.plan.effort[lapIndex];
-    const targetSpeed = runner.averageSpeed + effort * (runner.topSpeed - runner.averageSpeed);
+
+    // Running style: any speed bonuses right now, and how hard they want to run.
+    const surroundings = { gapAhead: gapAhead(index, startDistances), gapBehind: gapBehind(index, startDistances) };
+    const bonus = speedBonuses(e, lapIndex, surroundings);
+    const averageSpeed = runner.averageSpeed * (1 + bonus.speed);
+    const topSpeed = runner.topSpeed * (1 + bonus.speed + bonus.topSpeed);
+    const stylePlan = planFor(e, lapIndex);
+
+    if (e.chasing) {
+      const gotItBack = e.distance > e.chasing.target.distance;
+      const tooTired = e.stamina < STYLES.frontRunner.chaseStopsAtStamina * runner.maxStamina;
+      if (gotItBack || tooTired || e.distance >= e.chasing.until || lapIndex === tuning.laps - 1) e.chasing = null;
+    }
+
+    let effort = Math.max(e.plan.effort[lapIndex], stylePlan.effort);
+    if (e.chasing) effort = Math.max(effort, CHASE.effort);
+    if (e.kicking) effort = 1;
+    const pace = effort > 0 ? 1 : stylePlan.pace; // hanging back (Closer) only applies when not pushing
+    const targetSpeed = averageSpeed * pace + effort * (topSpeed - averageSpeed);
 
     // 2. Speed up or slow down.
     if (e.stamina <= 0) {
@@ -112,7 +142,7 @@ export function createRace(player, rivals, rng, plan = PLANS.even) {
     } else if (e.speed > targetSpeed) {
       e.speed = Math.max(e.speed - tuning.easeOffRate * dt, targetSpeed);
     }
-    if (e.speed >= runner.averageSpeed) e.reachedPace = true;
+    if (e.speed >= Math.min(targetSpeed, runner.averageSpeed) - 1e-9) e.reachedPace = true;
 
     // 3. Move forward and use stamina.
     let meters = mphToMetersPerSecond(e.speed) * dt;
@@ -128,8 +158,9 @@ export function createRace(player, rivals, rng, plan = PLANS.even) {
     const crossesLapLine = e.distance < lapLineAhead && e.distance + meters >= lapLineAhead;
     const timeAtLapLine = race.time + tickTime * ((lapLineAhead - e.distance) / meters);
 
-    let used = staminaUsed(runner, e.speed, meters);
-    const gap = gapAhead(index, startDistances);
+    // Stamina cost is measured against the runner's speeds right now (including style bonuses).
+    let used = staminaUsed({ ...runner, averageSpeed, topSpeed }, e.speed, meters) * staminaFactor(e, e.speed, averageSpeed);
+    const gap = surroundings.gapAhead;
     if (gap !== null && gap <= tuning.draftingRangeMeters) used *= 1 - tuning.draftingStaminaSaving;
     e.stamina -= used;
     if (e.stamina <= 0) {
@@ -175,6 +206,20 @@ export function createRace(player, rivals, rng, plan = PLANS.even) {
     }
   }
 
+  // A Front Runner who just got passed might fight to get the position back.
+  function maybeChase(frontRunner, passer) {
+    const canChase =
+      frontRunner.runner.style === "frontRunner" &&
+      frontRunner.finishTime === null &&
+      !frontRunner.chasing &&
+      frontRunner.stamina > STYLES.frontRunner.chaseStopsAtStamina * frontRunner.runner.maxStamina &&
+      lapOf(frontRunner.distance) < tuning.laps - 1;
+    if (canChase && wantsToChase(frontRunner, rng)) {
+      frontRunner.chasing = { target: passer, until: frontRunner.distance + CHASE.maxMeters };
+      race.log.push({ type: "chase", entrant: frontRunner, target: passer, distance: frontRunner.distance, time: race.time });
+    }
+  }
+
   const race = {
     entrants,
     player: entrants[0],
@@ -212,6 +257,7 @@ export function createRace(player, rivals, rng, plan = PLANS.even) {
           const passed = i !== j && isAhead(startKeys, j, i) && isAhead(endKeys, i, j);
           if (passed && a.distance > tuning.ignorePassesFirstMeters) {
             race.log.push({ type: "pass", entrant: a, passed: b, distance: a.distance, time: race.time });
+            maybeChase(b, a);
           }
         });
       });
@@ -229,6 +275,7 @@ export function createRace(player, rivals, rng, plan = PLANS.even) {
         place: i + 1,
         name: e.runner.name,
         isPlayer: e.isPlayer,
+        style: e.runner.style,
         finishTime: e.finishTime,
       }));
     },
