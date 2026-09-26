@@ -35,8 +35,11 @@ Short entries, every session. This becomes the portfolio and essay material.
 - **One condition per race**, shown before picking a runner. Rain: Race IQ ends at +5%. Rivalry: a random CPU runner is tagged as the rival.
 - **Runners:** the player has 3 runners with fixed styles and picks one per race. CPUs get no cards but improve with you; 1–2 are always better than you.
 - **Tech:** Node.js in the terminal (same language as Three.js, so the race code carries over). Cards in one editable file. Seeded randomness so any race can be replayed.
-**What I learned:** A "seed" makes random numbers repeatable, so the same seed always gives the same race.
-**Next:** Answer the stat-math follow-ups, then step 2 (one runner, alone, splits and finish time).
+- **Stat follow-ups:** 150 stat points (max 35 in one stat). With 0 points, average pace is 7:15 and top speed pace is 6:15. Each Speed point takes 1 s off both; each Top Speed point takes 1 s off top speed only. Kick starts at 0.4 mph/s. Each Stamina point leaves 0.75 spare stamina over a race, so drain per lap = 25 + 0.0625 per Stamina point. That lets stamina matter later in the game without letting anyone sprint two laps.
+- **Kick button in the terminal:** press K to start kicking, K again to stop. Running styles still do their own surges automatically.
+- All race numbers live in `data/tuning.js` so we can tune without touching the code.
+**What I learned:** A "seed" makes random numbers repeatable, so the same seed always gives the same race. The sim runs like a flip-book: every 0.1 seconds it moves each runner forward a bit and takes away some stamina.
+**Next:** Step 3 (Determination rolls to recover from running out of stamina).
 
 ---
 
