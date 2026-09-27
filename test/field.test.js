@@ -45,9 +45,10 @@ test("same seed gives the same race", () => {
 });
 
 test("running right behind someone (drafting) saves a little stamina", () => {
-  const you = buildRunner("You", even25);
+  const steady25 = { ...even25, raceIQ: 50 }; // perfect Race IQ: no pace wobble, so the two stay together
+  const you = buildRunner("You", steady25);
   const solo = createRace(you, [], createRandom(1));
-  const drafting = createRace(you, [buildRunner("Pacer", even25)], createRandom(1));
+  const drafting = createRace(you, [buildRunner("Pacer", steady25)], createRandom(1));
   drafting.entrants[1].distance = 1; // the other runner starts 1 m ahead, so you tuck in behind
   for (let i = 0; i < 600; i++) {
     solo.step();
@@ -58,8 +59,9 @@ test("running right behind someone (drafting) saves a little stamina", () => {
 });
 
 test("a faster runner passing you shows up as a pass", () => {
-  const race = createRace(buildRunner("You", zeroPoints), [buildRunner("Speedy", { ...zeroPoints, speed: 35 })], createRandom(1));
-  race.player.distance = 50; // give yourself a head start so Speedy has to pass you
+  const steady = { ...zeroPoints, stamina: 20, raceIQ: 50 }; // steady pace, some spare stamina
+  const race = createRace(buildRunner("You", steady), [buildRunner("Speedy", { ...steady, speed: 35 })], createRandom(1));
+  race.player.distance = 20; // give yourself a head start so Speedy has to pass you
   while (!race.finished) race.step();
   const passes = race.log.filter((event) => event.type === "pass");
   assert.ok(passes.some((p) => p.entrant.runner.name === "Speedy" && p.passed.isPlayer));
@@ -94,6 +96,6 @@ test("smart computer runners time their kick better than careless ones", () => {
 });
 
 test("a solo race still works the same way", () => {
-  const result = runSolo(buildRunner("Test", zeroPoints), createRandom(1));
+  const result = runSolo(buildRunner("Test", { ...zeroPoints, raceIQ: 50 }), createRandom(1));
   assert.ok(result.finishTime > 435 && result.finishTime < 437);
 });

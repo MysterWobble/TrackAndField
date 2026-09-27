@@ -48,10 +48,11 @@ export function randomStatPoints(rng, total = tuning.statPointsTotal) {
   return points;
 }
 
-// Percentage bonuses a runner can get from styles, race conditions, and (later) cards.
+// Percentage bonuses a runner can get from styles, race conditions, and cards.
 // 0.10 = +10%. Bonuses for the same stat ADD together: +10% and +5% make +15%.
 // "speed" raises average speed AND top speed; "topSpeed" raises top speed only.
-export const BONUS_KEYS = ["speed", "topSpeed", "stamina", "kick", "determination", "raceIQ", "staminaDrain"];
+// "pushSpeed" is speed from cards: the runner goes faster by pushing harder, so it costs stamina.
+export const BONUS_KEYS = ["speed", "pushSpeed", "topSpeed", "stamina", "kick", "determination", "raceIQ", "staminaDrain"];
 
 export function addBonuses(...lists) {
   const total = Object.fromEntries(BONUS_KEYS.map((key) => [key, 0]));
@@ -71,16 +72,21 @@ function styleBonuses(style) {
 
 // Turns stat points into what the race actually uses.
 // `style` is a key from data/styles.js ("closer", "pacer", ...) or null for no style (used in tests).
-// `extraBonuses` are whole-race bonuses from race conditions (and cards, later).
-export function buildRunner(name, points, style = null, extraBonuses = {}) {
+// `extraBonuses` are bonuses from race conditions and cards.
+// `last` holds card rules applied after every other bonus:
+//   multiply: { stamina: 0.9, determination: 2, ... }   ("double Determination", Trip and Fall's -10%)
+//   raceIQ: 30                                          (Losing Your Form: sets Race IQ exactly, ignoring everything else)
+export function buildRunner(name, points, style = null, extraBonuses = {}, last = {}) {
   const bonuses = addBonuses(styleBonuses(style), extraBonuses);
+  const multiply = { speed: 1, stamina: 1, kick: 1, determination: 1, raceIQ: 1, ...last.multiply };
   const averagePace = tuning.zeroPointAveragePace - points.speed * tuning.secondsPerSpeedPoint;
   const topSpeedPace =
     tuning.zeroPointTopSpeedPace -
     points.speed * tuning.secondsPerSpeedPoint -
     points.topSpeed * tuning.secondsPerTopSpeedPoint;
-  const baseAverageSpeed = paceToMph(averagePace);
-  const baseTopSpeed = paceToMph(topSpeedPace);
+  const baseAverageSpeed = paceToMph(averagePace) * multiply.speed;
+  const baseTopSpeed = paceToMph(topSpeedPace) * multiply.speed;
+  const raceIQ = last.raceIQ !== undefined ? last.raceIQ : points.raceIQ * (1 + bonuses.raceIQ) * multiply.raceIQ;
 
   return {
     name,
@@ -92,15 +98,17 @@ export function buildRunner(name, points, style = null, extraBonuses = {}) {
     topSpeedPace, // seconds to run 1600 m at top speed, from stat points alone
     baseAverageSpeed, // mph, before bonuses
     baseTopSpeed, // mph, before bonuses
-    averageSpeed: baseAverageSpeed * (1 + bonuses.speed), // mph
-    topSpeed: baseTopSpeed * (1 + bonuses.speed + bonuses.topSpeed), // mph
-    maxStamina: (tuning.baseStamina + points.stamina * tuning.staminaPerPoint) * (1 + bonuses.stamina),
+    averageSpeed: baseAverageSpeed * (1 + bonuses.speed + bonuses.pushSpeed), // mph
+    topSpeed: baseTopSpeed * (1 + bonuses.speed + bonuses.pushSpeed + bonuses.topSpeed), // mph
+    maxStamina: (tuning.baseStamina + points.stamina * tuning.staminaPerPoint) * (1 + bonuses.stamina) * multiply.stamina,
     drainPerLap:
       (tuning.drainPerLapAtAveragePace + points.stamina * tuning.extraDrainPerLapPerStaminaPoint) *
       (1 + bonuses.staminaDrain),
-    kick: (tuning.baseKick + points.kick * tuning.kickPerPoint) * (1 + bonuses.kick), // mph gained per second when pushing
-    determination: points.determination * (1 + bonuses.determination), // % chance to recover stamina when running low
-    raceIQ: points.raceIQ * (1 + bonuses.raceIQ), // how smart the runner races (kick timing for now; positioning later)
+    kick: (tuning.baseKick + points.kick * tuning.kickPerPoint) * (1 + bonuses.kick) * multiply.kick, // mph gained per second when pushing
+    // How many times faster than normal stamina drains at top speed. Kick points make sprinting more efficient.
+    sprintDrain: Math.max(tuning.lowestSprintDrain, tuning.drainMultiplierAtTopSpeed - points.kick * tuning.kickSprintSavingPerPoint),
+    determination: points.determination * (1 + bonuses.determination) * multiply.determination, // % chance to recover stamina when low
+    raceIQ, // how smart the runner races: positioning mistakes, pace wobble, kick timing
   };
 }
 

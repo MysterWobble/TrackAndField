@@ -8,13 +8,13 @@ import { determinationBonus, rollDetermination } from "../src/determination.js";
 import { runSolo, PLANS } from "../src/race.js";
 
 const zeroPoints = { speed: 0, topSpeed: 0, stamina: 0, kick: 0, determination: 0, raceIQ: 0 };
-// A runner who sprints lap 1 and is guaranteed to run low on stamina.
+// A runner who sprints lap 1 with no spare stamina, so they're guaranteed to run low.
 const sprinter = (determination) =>
-  buildRunner("Test", { ...zeroPoints, speed: 25, topSpeed: 25, stamina: 25, kick: 25, determination });
+  buildRunner("Test", { ...zeroPoints, speed: 25, topSpeed: 25, raceIQ: 50, determination });
 
-test("bonus is 5 stamina plus 1 per 10 Determination", () => {
+test("bonus is 5 stamina plus 0.6 per Determination point", () => {
   assert.equal(determinationBonus(buildRunner("Test", zeroPoints)), 5);
-  assert.equal(determinationBonus(buildRunner("Test", { ...zeroPoints, determination: 30 })), 8);
+  assert.equal(determinationBonus(buildRunner("Test", { ...zeroPoints, determination: 30 })), 23);
 });
 
 test("0 Determination never succeeds, 100 or more always does", () => {

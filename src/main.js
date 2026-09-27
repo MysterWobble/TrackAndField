@@ -1,15 +1,15 @@
 // Entry point for `npm.cmd run race`.
 //
-//   npm.cmd run race                       -> pick 1 of your 3 runners, race plays live (press K to kick)
-//   npm.cmd run race -- 12345              -> replay seed 12345
-//   npm.cmd run race -- 12345 --runner 2   -> skip the question and race with runner 2
-//   npm.cmd run race -- 12345 --condition rain -> force a condition: hot, windy, fastTrack, rivalry, rain, none
-//   npm.cmd run race -- 12345 --instant    -> skip the live view, just print the results
-//   npm.cmd run race -- 12345 --fast-start -> your runner also sprints lap 1 (for testing)
-//   npm.cmd run race -- 12345 --det 0      -> set your Determination to 0 (for testing)
-//   npm.cmd run race -- 12345 --solo       -> race alone, no computer runners
-//
-// So far: race conditions, your 3 runners with running styles, and 7 computer runners. No cards yet.
+//   npm.cmd run race                            -> the full race: conditions, pick a runner, cards, race live (K = kick)
+//   npm.cmd run race -- 12345                   -> replay seed 12345
+//   npm.cmd run race -- 12345 --runner 2        -> skip the question and race with runner 2
+//   npm.cmd run race -- 12345 --condition rain  -> force a condition: hot, windy, fastTrack, rivalry, rain, none
+//   npm.cmd run race -- 12345 --picks 2,1,3,1   -> choose cards ahead of time (pre-race, after lap 1, 2, 3)
+//   npm.cmd run race -- 12345 --give "Flow State" -> make sure a card is offered (as choice 1) when it's allowed
+//   npm.cmd run race -- 12345 --instant         -> skip the live view, just print the results (random card picks)
+//   npm.cmd run race -- 12345 --fast-start      -> your runner also sprints lap 1 (for testing)
+//   npm.cmd run race -- 12345 --det 0           -> set your Determination to 0 (for testing)
+//   npm.cmd run race -- 12345 --solo            -> race alone, no computer runners
 
 import readline from "node:readline/promises";
 import { createRandom, newSeed } from "./random.js";
@@ -18,14 +18,27 @@ import { makeField, makeYourRunners } from "./field.js";
 import { createRace, PLANS } from "./race.js";
 import { runLive } from "./live.js";
 import { formatTime, ordinal } from "./units.js";
+import { checkCards } from "./checkCards.js";
+import { offerLines, pickPrompt } from "./cardScreen.js";
+import { CARDS } from "../data/cards.js";
 import { STYLES } from "../data/styles.js";
 import { CONDITIONS, CONDITION_KEYS } from "../data/conditions.js";
 import { tuning } from "../data/tuning.js";
+
+// Check the card file before anything else, so mistakes get explained instead of crashing mid-race.
+const cardProblems = checkCards(CARDS);
+if (cardProblems.length) {
+  console.log("There's a problem in data/cards.js:\n");
+  for (const problem of cardProblems) console.log(`  - ${problem}`);
+  process.exit(1);
+}
 
 let seedArg;
 let detArg;
 let runnerArg;
 let conditionArg;
+let picksArg;
+let giveArg;
 let instant = false;
 let solo = false;
 let plan = PLANS.even;
@@ -37,6 +50,8 @@ for (let i = 0; i < args.length; i++) {
   else if (args[i] === "--det") detArg = args[++i];
   else if (args[i] === "--runner") runnerArg = args[++i];
   else if (args[i] === "--condition") conditionArg = args[++i];
+  else if (args[i] === "--picks") picksArg = args[++i];
+  else if (args[i] === "--give") giveArg = args[++i];
   else seedArg = args[i];
 }
 
@@ -53,9 +68,18 @@ if (runnerArg !== undefined && !["1", "2", "3"].includes(runnerArg)) {
   console.log("--runner needs 1, 2 or 3, like: npm.cmd run race -- 12345 --runner 2");
   process.exit(1);
 }
-
 if (conditionArg !== undefined && conditionArg !== "none" && !CONDITION_KEYS.includes(conditionArg)) {
   console.log(`--condition needs one of: ${[...CONDITION_KEYS, "none"].join(", ")}`);
+  process.exit(1);
+}
+const presetPicks = picksArg === undefined ? [] : picksArg.split(",").map(Number);
+if (presetPicks.some((n) => ![1, 2, 3].includes(n))) {
+  console.log("--picks needs up to 4 choices of 1, 2 or 3, like: npm.cmd run race -- 12345 --picks 2,1,3,1");
+  process.exit(1);
+}
+const givenCard = giveArg === undefined ? null : CARDS.find((card) => card.name.toLowerCase() === giveArg.toLowerCase());
+if (giveArg !== undefined && !givenCard) {
+  console.log(`--give: there's no card called "${giveArg}". Card names are in data/cards.js.`);
   process.exit(1);
 }
 
@@ -64,6 +88,10 @@ const rng = createRandom(seed);
 const yourRunners = makeYourRunners(rng);
 const conditionKey = conditionArg ?? rng.pick(CONDITION_KEYS);
 const condition = conditionKey === "none" ? null : CONDITIONS[conditionKey];
+
+// Card offers get their own random numbers per pick moment, so the same seed always offers the same
+// cards no matter what happened earlier in the race (that keeps the Daily Race fair).
+const cardRandom = (moment) => createRandom(seed * 1000 + moment + 7);
 
 console.log(`Seed: ${seed}\n`);
 console.log(`TODAY'S CONDITIONS: ${condition ? condition.name.toUpperCase() : "NONE"}`);
@@ -98,21 +126,73 @@ if (rivals.length) {
   }
 }
 
-console.log(`\nRACE${plan === PLANS.even ? "" : ` (your plan: ${plan.label})`}`);
-
 // The live view needs a real terminal to read key presses. If there isn't one, fall back to instant.
 if (!instant && !hasKeyboard) {
-  console.log("  (No keyboard available here, so showing instant results instead.)");
+  console.log("\n(No keyboard available here, so showing instant results instead.)");
   instant = true;
 }
 
+// Before the race: pick a Preparation card.
+const preRaceOffer = race.offerCards(0, cardRandom(0), givenCard);
+if (preRaceOffer.length) {
+  for (const line of offerLines(preRaceOffer, 0)) console.log(line);
+  const index = instant ? instantPick(preRaceOffer, 0) : await askPick(preRaceOffer, 0);
+  takeCard(preRaceOffer[index], 0, (line) => console.log(line));
+}
+
+console.log(`\nRACE${plan === PLANS.even ? "" : ` (your plan: ${plan.label})`}`);
+
 if (instant) {
-  while (!race.finished) race.step();
-  printYourRace();
+  let lapsDone = 0;
+  const picksDuringRace = [];
+  while (!race.finished) {
+    race.step();
+    if (race.player.laps.length > lapsDone) {
+      lapsDone = race.player.laps.length;
+      if (lapsDone < tuning.laps) {
+        const offer = race.offerCards(lapsDone, cardRandom(lapsDone), givenCard);
+        if (offer.length) {
+          const index = instantPick(offer, lapsDone);
+          const where = ordinal(race.positionOf(race.player));
+          takeCard(offer[index], lapsDone, (line) => picksDuringRace.push(line), `After lap ${lapsDone} (${where}): `);
+        }
+      }
+    }
+  }
+  printYourRace(picksDuringRace);
   printResults();
 } else {
-  const { finished } = await runLive(race);
+  const { finished } = await runLive(race, {
+    offerCards: (moment) => race.offerCards(moment, cardRandom(moment), givenCard),
+    presetPick: (moment) => (presetPicks[moment] === undefined ? undefined : presetPicks[moment] - 1),
+    takeCard: (card, moment, say) => takeCard(card, moment, say),
+  });
   if (finished) printResults();
+}
+
+// Gives the player a card and shows what happened.
+function takeCard(card, moment, show, prefix = "") {
+  const messages = race.pickCard(card, cardRandom(moment + 200)); // its own random numbers (e.g. "people watching" coin flip)
+  show(`  ${prefix}You picked "${card.name}"`);
+  for (const message of messages) show(`  ${message}`);
+}
+
+// Instant mode: use --picks if given, otherwise pick at random (the same way every time for this seed).
+function instantPick(offer, moment) {
+  const preset = presetPicks[moment];
+  if (preset !== undefined) return Math.min(preset, offer.length) - 1;
+  return cardRandom(moment + 100).int(0, offer.length - 1);
+}
+
+async function askPick(offer, moment) {
+  const preset = presetPicks[moment];
+  if (preset !== undefined) return Math.min(preset, offer.length) - 1;
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const valid = offer.map((_, i) => String(i + 1));
+  let answer;
+  while (!valid.includes(answer)) answer = (await rl.question(`  ${pickPrompt(offer.length)}: `)).trim();
+  rl.close();
+  return Number(answer) - 1;
 }
 
 async function chooseRunner() {
@@ -130,15 +210,18 @@ async function chooseRunner() {
   return Number(answer);
 }
 
-function printYourRace() {
+function printYourRace(picksDuringRace) {
   const you = race.player;
+  const hidden = you.cardFlags.hideStats; // Flow State hides your stats
   console.log("  Lap   Lap time   Split    Stamina left   Position");
   for (const lap of you.laps) {
+    const stamina = hidden ? "???" : lap.staminaLeft.toFixed(0);
     console.log(
-      `   ${lap.lap}    ${formatTime(lap.lapTime).padStart(6)}   ${formatTime(lap.split).padStart(6)}   ${lap.staminaLeft.toFixed(0).padStart(7)}        ${ordinal(lap.position)}`,
+      `   ${lap.lap}    ${formatTime(lap.lapTime).padStart(6)}   ${formatTime(lap.split).padStart(6)}   ${stamina.padStart(7)}        ${ordinal(lap.position)}`,
     );
   }
   console.log("");
+  for (const line of picksDuringRace) console.log(line);
   if (you.ranOutAt !== null) {
     const lap = Math.floor(you.ranOutAt / tuning.lapMeters) + 1;
     console.log(`  Ran out of stamina at ${Math.round(you.ranOutAt)} m (lap ${lap}).`);
@@ -149,7 +232,8 @@ function printYourRace() {
   const passes = race.log.filter((e) => e.type === "pass");
   const made = passes.filter((e) => e.entrant === you).length;
   const taken = passes.filter((e) => e.passed === you).length;
-  if (rivals.length) console.log(`  You passed runners ${made} times and got passed ${taken} times.`);
+  const boxed = race.log.filter((e) => e.type === "boxed" && e.entrant === you).length;
+  if (rivals.length) console.log(`  You passed runners ${made} times, got passed ${taken} times, and got boxed in ${boxed} times.`);
 }
 
 function printResults() {

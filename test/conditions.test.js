@@ -25,7 +25,7 @@ test("bonuses for the same stat add together", () => {
 });
 
 test("Hot Day: stamina drains 10% faster, so you finish with less", () => {
-  const runner = buildRunner("You", stats);
+  const runner = buildRunner("You", { ...stats, determination: 0 }); // no lucky stamina boosts blurring the comparison
   const normal = soloRace(runner, null);
   const hot = soloRace(runner, CONDITIONS.hot);
   assert.ok(close(hot.player.runner.drainPerLap, runner.drainPerLap * 1.1));
@@ -86,8 +86,9 @@ test("Fast Track: top speed is 5% higher too", () => {
 });
 
 test("Windy: tucking in behind someone shelters you from the headwind, without passing them", () => {
-  const leader = buildRunner("Leader", stats);
-  const follower = buildRunner("You", { ...stats, speed: 20 }); // a bit slower than the leader
+  // Perfect Race IQ, so pace wobble doesn't blur the comparison.
+  const leader = buildRunner("Leader", { ...stats, raceIQ: 50 });
+  const follower = buildRunner("You", { ...stats, speed: 20, raceIQ: 50 }); // a bit slower than the leader
   const race = createRace(follower, [leader], createRandom(1), undefined, CONDITIONS.windy);
   race.entrants[1].distance = 2; // the leader starts 2 m ahead, so you're tucked in
   const alone = createRace(follower, [], createRandom(1), undefined, CONDITIONS.windy);

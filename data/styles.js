@@ -9,7 +9,7 @@ export const STYLES = {
   frontRunner: {
     name: "Front Runner",
     description: "Surges on lap 1 and fights to keep their position when passed. Race IQ keeps them calmer.",
-    lap1Surge: 0.5, // lap 1 effort: 0 = average pace, 1 = top speed, 0.5 = halfway
+    lap1Surge: 0.2, // lap 1 effort: 0 = average pace, 1 = top speed (0.2 = a fifth of the way; 0.5 made them far too strong)
     surgeShrinkPerRaceIQ: 0.01, // each Race IQ point makes the lap 1 surge 1% smaller (30 IQ -> 30% smaller)
     neverChaseRaceIQ: 50, // chance to fight back when passed = 100% at 0 Race IQ, down to 0% at this much
     chaseEffort: 0.5, // how hard they push while fighting back

@@ -70,6 +70,27 @@ Short entries, every session. This becomes the portfolio and essay material.
   - Result: about 12–15 passes per race in every condition, never more than about 10 swaps between one pair. A test now guards against this.
 **Next:** Cards.
 
+## 2026-09-26 (later): Race IQ and cards
+**Decisions made (and why):**
+- **Card speed costs stamina** (the runner pushes harder), except "Put these on quick" (new shoes). Top speed cards stay free.
+- **Race IQ now matters for every runner:** low Race IQ means a wobbly pace (up to ±5%), getting boxed in when stuck in a pack (10% slower for 3 s), and extra stamina spent swinging wide when passing. 0 → 50 Race IQ is worth about 4 s and 1 place (Front Runners excepted, because Race IQ also shrinks their lap-1 surge).
+- **Settle-in rule:** after being passed, a runner settles in behind for 15 s instead of passing straight back. This ended the last swap loop.
+- **Cards (built by Claude):** all 23 cards from the spec are in `data/cards.js`, checked at startup with plain-English errors. You pick 1 of 3 before the race and after laps 1–3 (the live race pauses). Unique and rivalry cards appear a third as often, and no card repeats in a race. Card offers use their own random numbers per pick, so the same seed always offers the same cards (fair Daily Race).
+**Playtest finding (150 simulated races per card, card given alone):** speed cards dominate. The Shoes and Coach Pep-Talk save ~34 s (1st place almost every time), other speed cards save 13–21 s, and Race IQ and Determination cards save under 1 s. "I won't stop here" costs ~34 s because its −10% includes speed. Choices don't matter yet, so card numbers need a rethink.
+- **Decision: card numbers are now stat points**, the same currency as training. Speed cards were halved: +10% became +20 Speed points (about 20 s instead of about 38 s). Other stats keep their number as points (+10% Race IQ became +10 Race IQ). "Double" cards really multiply. Stamina drain stays a percent. "I won't stop here" no longer cuts speed.
+- **Result (150 races per card):** Shoes and Coach Pep-Talk now save ~19 s (was ~34 s). Other speed cards save 7–14 s. "I won't stop here" costs ~1.5 s (was ~34 s). Race IQ and Determination cards still save under 1 s.
+- **Root cause found:** the stats themselves are unequal. With smart kick timing, +10 points is worth: Speed 9.5 s, Stamina 3.3 s, Top Speed 1.5 s, Race IQ 0.7 s, Determination 0.5 s, Kick 0.4 s. Cards for weak stats can't matter until the stats are rebalanced. This also affects random runners and training.
+- **Stat rebalance (designers asked: nerf Speed more, buff everything else, but don't make everything the same):**
+  - Speed point: 1 s → 0.55 s. Top Speed point: 1 s → 2 s. Stamina point: 1 → 1.25 tank (1 spare stamina per point).
+  - Kick: base 0.4 → 0.25 mph/s, per point 0.02 → 0.04. **New Kick effect:** each Kick point makes sprinting burn less stamina (2.5× normal drain at top speed, minus 0.02× per Kick point), because acceleration alone was cancelled out by stamina.
+  - Determination: rolls start below 35% stamina (was 25%), and the bonus is 5 + 0.6 per point (was 0.1).
+  - Race IQ mistakes cost more: pace wobble ±10%, boxed in 25% slower for 4 s, swinging wide costs 10 stamina.
+  - Card speed now costs a clear 3% more stamina per 1% faster (the old stamina-curve cost dropped to about 1 stamina after the rebalance).
+  - Front Runner lap-1 surge 0.5 → 0.2. Wider top speeds had made them win far too often (average place 2.4 vs ~4.5).
+- **Result:** +10 points is now worth Speed 4.2 s, Top Speed 4.3 s, Stamina 1.4 s, Kick 1.4 s, Determination 1.3 s, Race IQ 1.0 s (was 9.5 / 1.5 / 3.3 / 0.4 / 0.5 / 0.7). The best card is now "Less than a lap left!" (11.7 s). Speed cards are 4–10 s. Race IQ cards are still weakest (0.5–1.1 s). Front Runners are still the strongest style (avg place ~2.9 vs ~4.0–4.9).
+- **New tool:** `npm run balance` prints both tables, and `--try '{...}'` tests tuning numbers without editing files.
+**Next:** Playtest. Possibly buff Race IQ cards and look at why Front Runners win (leading avoids traffic mistakes).
+
 ---
 
 ## Milestones

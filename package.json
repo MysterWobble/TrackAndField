@@ -6,6 +6,7 @@
   "private": true,
   "scripts": {
     "race": "node src/main.js",
+    "balance": "node src/balance.js",
     "check:determination": "node src/check-determination.js",
     "test": "node --test"
   }

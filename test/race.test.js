@@ -8,6 +8,8 @@ import { runSolo, PLANS } from "../src/race.js";
 import { formatTime } from "../src/units.js";
 
 const zeroPoints = { speed: 0, topSpeed: 0, stamina: 0, kick: 0, determination: 0, raceIQ: 0 };
+// Perfect Race IQ means no pace wobble, so stamina math comes out exact. (Race IQ doesn't change pace or stamina.)
+const steady = { ...zeroPoints, raceIQ: 50 };
 
 test("formatTime shows race time like 7:15.0", () => {
   assert.equal(formatTime(435), "7:15.0");
@@ -26,23 +28,23 @@ test("random runners get exactly 150 points, none over 35", () => {
 
 test("stat points turn into the right paces", () => {
   const runner = buildRunner("Test", { ...zeroPoints, speed: 30, topSpeed: 20 });
-  assert.equal(runner.averagePace, 405); // 7:15 - 30s
-  assert.equal(runner.topSpeedPace, 325); // 6:15 - 30s - 20s
+  assert.equal(runner.averagePace, 435 - 30 * 0.55); // 7:15 - 0.55 s per Speed point
+  assert.equal(runner.topSpeedPace, 375 - 30 * 0.55 - 20 * 2); // 6:15 - Speed points - 2 s per Top Speed point
 });
 
-test("a 0-point runner at even pace finishes just over 7:15 with almost no stamina left", () => {
-  const result = runSolo(buildRunner("Test", zeroPoints), createRandom(1));
+test("a runner with 0 Speed/Stamina points at even pace finishes just over 7:15 with almost no stamina left", () => {
+  const result = runSolo(buildRunner("Test", steady), createRandom(1));
   assert.ok(result.finishTime > 435 && result.finishTime < 437, formatTime(result.finishTime));
   assert.ok(result.staminaLeft < 2, `stamina left ${result.staminaLeft}`);
 });
 
-test("each Stamina point leaves about 0.75 spare stamina at even pace", () => {
-  const result = runSolo(buildRunner("Test", { ...zeroPoints, stamina: 20 }), createRandom(1));
-  assert.ok(result.staminaLeft > 14 && result.staminaLeft < 17, `stamina left ${result.staminaLeft}`);
+test("each Stamina point leaves about 1 spare stamina at even pace", () => {
+  const result = runSolo(buildRunner("Test", { ...steady, stamina: 20 }), createRandom(1));
+  assert.ok(result.staminaLeft > 18.5 && result.staminaLeft < 21.5, `stamina left ${result.staminaLeft}`);
 });
 
-test("sprinting lap 1 runs out of stamina and ends up slower than even pace", () => {
-  const runner = buildRunner("Test", { ...zeroPoints, speed: 25, topSpeed: 25, stamina: 25, kick: 25 });
+test("with no spare stamina, sprinting lap 1 runs out and ends up slower than even pace", () => {
+  const runner = buildRunner("Test", { ...steady, speed: 25, topSpeed: 25 }); // 0 Stamina points: no spare stamina
   const even = runSolo(runner, createRandom(1), PLANS.even);
   const fast = runSolo(runner, createRandom(1), PLANS.fastStart);
   assert.equal(even.ranOutAt, null);

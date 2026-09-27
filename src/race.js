@@ -18,7 +18,8 @@ import { staminaUsed } from "./stamina.js";
 import { rollDetermination } from "./determination.js";
 import { planFor, speedBonuses, staminaFactor, wantsToChase, CHASE } from "./styles.js";
 import { STYLES } from "../data/styles.js";
-import { withBonuses } from "./runner.js";
+import { addBonuses, buildRunner, withBonuses } from "./runner.js";
+import { applyCard, cardBonuses, offerCards } from "./cards.js";
 
 // A pace plan says how hard to run each lap: 0 = average pace, 1 = top speed, 0.5 = halfway between.
 export const PLANS = {
@@ -30,14 +31,20 @@ function lapOf(distance) {
   return Math.min(Math.floor(distance / tuning.lapMeters), tuning.laps - 1);
 }
 
-// How far off a computer runner's kick timing can be. Race IQ makes it more accurate.
-function kickMisjudge(runner) {
-  return tuning.computerKickMisjudge * Math.max(0, 1 - runner.raceIQ / tuning.perfectKickRaceIQ);
+// How likely a runner is to make Race IQ mistakes: 1 at 0 Race IQ, down to 0 at perfectRaceIQ.
+function mistakeFactor(runner) {
+  return Math.max(0, 1 - runner.raceIQ / tuning.perfectRaceIQ);
 }
 
-function createEntrant(runner, isPlayer, plan, rng) {
+// How far off a computer runner's kick timing can be. Race IQ makes it more accurate.
+function kickMisjudge(runner) {
+  return tuning.computerKickMisjudge * mistakeFactor(runner);
+}
+
+function createEntrant(runner, isPlayer, plan, rng, baseRunner = runner) {
   return {
-    runner,
+    runner, // the runner as they are right now (with condition and card bonuses)
+    baseRunner, // the runner before any race bonuses (cards get re-added on top of this)
     isPlayer,
     plan,
     distance: 0,
@@ -47,6 +54,11 @@ function createEntrant(runner, isPlayer, plan, rng) {
     hasKicked: false, // computer runners only kick once
     chasing: null, // a Front Runner fighting to get a position back: { target, until }
     noChaseUntil: 0, // race time before which a Front Runner won't fight back again
+    wobble: 0, // Race IQ: how far their cruising pace has drifted right now (0.02 = 2% fast)
+    nextWobbleIn: 0, // seconds until their pace drifts again
+    boxedFor: 0, // Race IQ: seconds left stuck behind the runner ahead
+    passedBy: new Map(), // runner who passed them -> race time it happened
+    noBoxUntil: 0, // race time before which they can't get boxed in again
     kickTiming: isPlayer ? 0 : rng.range(-1, 1) * kickMisjudge(runner), // + means they'll go too early
     reachedPace: false, // true once they first get up to average pace
     nextRollIn: 0, // seconds until the next Determination roll
@@ -55,6 +67,9 @@ function createEntrant(runner, isPlayer, plan, rng) {
     finishTime: null,
     laps: [],
     events: [], // this runner's Determination successes
+    cards: [], // cards picked (player only): { card, pickedAt, ... }
+    cardFlags: {}, // switches from active cards: hideStats, paceFuzz, matchRunnerAhead
+    fallenFor: 0, // seconds left on the ground after tripping ("I won't stop here")
   };
 }
 
@@ -65,7 +80,7 @@ export function createRace(player, rivals, rng, plan = PLANS.even, condition = n
   // Race conditions affect everyone, so every runner gets the condition's bonuses.
   const applyCondition = (runner) => (condition?.bonuses ? withBonuses(runner, condition.bonuses) : runner);
   const entrants = [
-    createEntrant(applyCondition(player), true, plan, rng),
+    createEntrant(applyCondition(player), true, plan, rng, player),
     ...rivals.map((runner) => createEntrant(applyCondition(runner), false, PLANS.even, rng)),
   ];
 
@@ -107,14 +122,36 @@ export function createRace(player, rivals, rng, plan = PLANS.even, condition = n
     return gap;
   }
 
+  // Rebuilds a runner from their cards (cards can change mid-race: "until you pass two runners", "per lap", ...).
+  function refreshCards(e) {
+    const { points, pushSpeedPoints, percent, last, flags } = cardBonuses(race, e);
+    const base = e.baseRunner;
+    const cardPoints = { ...base.points };
+    for (const [stat, amount] of Object.entries(points)) cardPoints[stat] = Math.max(0, cardPoints[stat] + amount);
+    // Card speed that costs stamina: the same pace gain as Speed points, but counted as pushing harder.
+    const pace = tuning.zeroPointAveragePace - cardPoints.speed * tuning.secondsPerSpeedPoint;
+    const pushSpeed = pushSpeedPoints ? pace / (pace - pushSpeedPoints * tuning.secondsPerSpeedPoint) - 1 : 0;
+    const rules = { multiply: last.multiply };
+    if (last.raceIQPointsOverBase !== undefined) rules.raceIQ = base.points.raceIQ + last.raceIQPointsOverBase;
+    const bonuses = addBonuses(base.extraBonuses, condition?.bonuses, percent, { pushSpeed });
+    const updated = buildRunner(base.name, cardPoints, base.style, bonuses, rules);
+    // A bigger stamina tank fills up by the difference; a smaller one can't hold more than it fits.
+    const tankChange = updated.maxStamina - e.runner.maxStamina;
+    if (tankChange > 0) e.stamina += tankChange;
+    e.stamina = Math.min(e.stamina, updated.maxStamina);
+    e.runner = updated;
+    e.cardFlags = flags;
+  }
+
   function moveEntrant(e, index, startDistances) {
+    if (e.cards.length) refreshCards(e);
     const runner = e.runner;
     const lapIndex = lapOf(e.distance);
 
     // 1. How fast do they want to go?
     if (!e.isPlayer && lapIndex === tuning.laps - 1 && !e.hasKicked && e.stamina > 0) {
       // Computer kick: go once the finish is about as far as their stamina can sprint.
-      const drainPerMeterAtTop = (runner.drainPerLap / tuning.lapMeters) * tuning.drainMultiplierAtTopSpeed;
+      const drainPerMeterAtTop = (runner.drainPerLap / tuning.lapMeters) * runner.sprintDrain;
       const canSprintMeters = e.stamina / drainPerMeterAtTop;
       if (finishLine - e.distance <= canSprintMeters * (1 + e.kickTiming)) {
         e.kicking = true;
@@ -136,9 +173,9 @@ export function createRace(player, rivals, rng, plan = PLANS.even, condition = n
     const sheltered = wind < 0 && surroundings.gapAhead !== null && surroundings.gapAhead <= condition.shelterMeters;
     const windBonus = sheltered ? wind * (1 - condition.headwindShelter) : wind;
 
-    // Every speed bonus adds together: whole-race ones (conditions), style ones, and the wind.
+    // Every speed bonus adds together: conditions, cards, style, and the wind.
     const speedsWith = (windPart) => {
-      const speedBonus = runner.bonuses.speed + bonus.speed + windPart;
+      const speedBonus = runner.bonuses.speed + runner.bonuses.pushSpeed + bonus.speed + windPart;
       return {
         average: runner.baseAverageSpeed * (1 + speedBonus),
         top: runner.baseTopSpeed * (1 + speedBonus + runner.bonuses.topSpeed + bonus.topSpeed),
@@ -159,7 +196,14 @@ export function createRace(player, rivals, rng, plan = PLANS.even, condition = n
     let effort = Math.max(e.plan.effort[lapIndex], stylePlan.effort);
     if (e.chasing) effort = Math.max(effort, CHASE.effort);
     if (e.kicking) effort = 1;
-    const pace = effort > 0 ? 1 : stylePlan.pace; // hanging back (Closer) only applies when not pushing
+    // Race IQ: a low-IQ runner's cruising pace drifts around (Pacers never drift).
+    e.nextWobbleIn -= dt;
+    if (e.nextWobbleIn <= 0) {
+      e.nextWobbleIn = tuning.paceWobbleEverySeconds;
+      e.wobble = runner.style === "pacer" ? 0 : rng.range(-1, 1) * tuning.paceWobble * mistakeFactor(runner);
+    }
+    const cruising = effort === 0;
+    const pace = cruising ? stylePlan.pace * (1 + e.wobble) : 1; // hanging back and drifting only apply when not pushing
     const targetFor = (speeds) => speeds.average * pace + effort * (speeds.top - speeds.average);
     let targetSpeed = targetFor({ average: averageSpeed, top: topSpeed });
     if (sheltered) {
@@ -169,8 +213,42 @@ export function createRace(player, rivals, rng, plan = PLANS.even, condition = n
       targetSpeed = Math.max(exposedTarget, Math.min(targetSpeed, entrants[ahead].speed));
     }
 
+    // "I want you on his back!": match the runner ahead, even past your top speed.
+    if (e.cardFlags.matchRunnerAhead && ahead !== null && e.stamina > 0) {
+      targetSpeed = Math.max(targetSpeed, entrants[ahead].speed);
+    }
+
+    // Race IQ: stuck right behind someone with a runner beside you, you might get boxed in.
+    if (e.boxedFor > 0) {
+      e.boxedFor -= dt;
+      if (e.boxedFor <= 0) e.noBoxUntil = race.time + tuning.boxedInCooldownSeconds;
+    } else if (ahead !== null && race.time >= e.noBoxUntil) {
+      const stuckBehind = surroundings.gapAhead <= tuning.boxedInPackMeters && targetSpeed > entrants[ahead].speed;
+      const someoneBeside = startDistances.some(
+        (d, k) => k !== index && k !== ahead && entrants[k].finishTime === null && Math.abs(d - startDistances[index]) <= 1.5,
+      );
+      if (stuckBehind && someoneBeside && rng.chance(tuning.boxedInChancePerSecond * dt * mistakeFactor(runner))) {
+        e.boxedFor = tuning.boxedInSeconds;
+        race.log.push({ type: "boxed", entrant: e, distance: e.distance, time: race.time });
+      }
+    }
+    if (e.boxedFor > 0 && ahead !== null) targetSpeed = Math.min(targetSpeed, entrants[ahead].speed * (1 - tuning.boxedInSlowdown));
+
+    // Just got passed by the runner right ahead? Settle in behind them for a while instead of passing straight back.
+    if (ahead !== null && !e.kicking && !e.chasing && surroundings.gapAhead <= tuning.boxedInPackMeters) {
+      const passedAt = e.passedBy.get(entrants[ahead]);
+      if (passedAt !== undefined && race.time - passedAt < tuning.settleInSeconds) {
+        targetSpeed = Math.min(targetSpeed, entrants[ahead].speed);
+      }
+    }
+
     // 2. Speed up or slow down.
-    if (e.stamina <= 0) {
+    if (e.fallenFor > 0) {
+      // Tripped: on the ground, then back up from a standstill.
+      e.fallenFor -= dt;
+      e.speed = 0;
+      e.reachedPace = false;
+    } else if (e.stamina <= 0) {
       // Out of stamina: fade by 10% of average speed per second, down to 50%.
       const floor = tuning.exhaustedFloor * runner.averageSpeed;
       e.speed = Math.max(e.speed - tuning.exhaustedSlowdownPerSecond * runner.averageSpeed * dt, floor);
@@ -199,7 +277,9 @@ export function createRace(player, rivals, rng, plan = PLANS.even, condition = n
     const timeAtLapLine = race.time + tickTime * ((lapLineAhead - e.distance) / meters);
 
     // Stamina cost is measured against the runner's speeds right now (including style bonuses).
-    let used = staminaUsed({ ...runner, averageSpeed, topSpeed }, e.speed, meters) * staminaFactor(e, e.speed, averageSpeed, condition);
+    // Card speed ("pushSpeed") is you pushing harder: every 1% faster costs pushSpeedDrain% more stamina.
+    const pushCost = 1 + runner.bonuses.pushSpeed * tuning.pushSpeedDrain;
+    let used = staminaUsed({ ...runner, averageSpeed, topSpeed }, e.speed, meters) * staminaFactor(e, e.speed, averageSpeed, condition) * pushCost;
     const gap = surroundings.gapAhead;
     const draftingSaving = tuning.draftingStaminaSaving * (condition?.draftingMultiplier ?? 1); // bigger in the wind
     if (gap !== null && gap <= tuning.draftingRangeMeters) used *= 1 - draftingSaving;
@@ -303,6 +383,9 @@ export function createRace(player, rivals, rng, plan = PLANS.even, condition = n
           const passed = i !== j && isAhead(startKeys, j, i) && isAhead(endKeys, i, j);
           if (passed && a.distance > tuning.ignorePassesFirstMeters) {
             race.log.push({ type: "pass", entrant: a, passed: b, distance: a.distance, time: race.time });
+            b.passedBy.set(a, race.time);
+            // Race IQ: passing means swinging wide, and low-IQ runners swing wider (extra effort).
+            a.stamina = Math.max(0, a.stamina - tuning.passWideStamina * mistakeFactor(a.runner));
             maybeChase(b, a);
           }
         });
@@ -325,6 +408,18 @@ export function createRace(player, rivals, rng, plan = PLANS.even, condition = n
         style: e.runner.style,
         finishTime: e.finishTime,
       }));
+    },
+
+    // Up to 3 cards to choose from. moment: 0 = before the race, 1-3 = after that lap.
+    offerCards(moment, rng, forced = null) {
+      return offerCards(moment, race, rng, forced);
+    },
+
+    // Give the player a card. Returns messages to show (like how "people watching" turned out).
+    pickCard(card, rng) {
+      const messages = applyCard(race, race.player, card, rng);
+      refreshCards(race.player);
+      return messages;
     },
 
     // The player's race, in the same shape runSolo() returns.
