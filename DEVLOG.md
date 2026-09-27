@@ -55,7 +55,20 @@ Short entries, every session. This becomes the portfolio and essay material.
 - **Bug found by simulation:** two Competitors kept leapfrogging each other (1,283 passes per race). Fix: within 2 m of someone, a Competitor tucks in and runs normally. The "leading" penalty only applies once 2 m clear. Now about 16 passes per race.
 - **Balance finding (300 simulated races, computer runners):** Front Runner avg 3.2nd place (26% wins), Pacer 3.9 (17%), Competitor 4.0 (10%), Closer 5.8 (3%). Closers lose about 16 s hanging back but only save enough stamina for about 45 m more sprinting. Best option tested: 97% early pace + 20% top speed (Closer 4.7, 12% wins).
 - **Decision:** Closers now run 97% pace early and get +20% top speed on the last lap (option D), because it was the most balanced option while keeping the "hang back, then explode" feel.
-**Next:** Race conditions (shown before you pick your runner).
+- **Race conditions (built by Claude):** one random condition per race, shown before you pick your runner, affecting every runner. Numbers live in `data/conditions.js`. Rain's "all stats −5%" lowers top speed by 5% through Speed (not 10%). Windy = tailwind on the first 200 m of each lap, headwind on the second 200 m. Rivalry tags a random computer runner as your rival.
+- **Bonus system:** styles, conditions and (later) cards all feed one list of percentage bonuses per stat, which add together.
+- **Balance finding (200 races per condition):** Hot (+5 s winning time) and Rain (+23 s) change results and hurt Closers most. Windy, Fast Track and Rivalry barely change anything, and Front Runners are the best style in every condition. Also: rain makes a personal best much harder to set.
+- **Condition changes:**
+  - *Hot Day:* Pacer's stamina saving doubles to 20%. Pacer avg place improved from 4.2 to 3.6, so the Pacer is now a real pick on hot days.
+  - *Fast Track:* also +5% top speed. Winning times are about 3 s faster.
+  - *Windy:* drafting saves 3× the stamina, and runners within 5 m behind someone block 80% of the headwind. Only a small effect at ±5% wind (Closer 4.84 → 4.66). At ±10% wind, Windy becomes Closer weather (4.44).
+  - *Rain:* marked for a separate personal best, to be built with saving (PLAN step 4).
+- **Decision:** wind raised from ±5% (original spec) to ±10%, so windy days reward sheltering in the pack.
+- **Two more swap-loop bugs found by simulation and fixed:**
+  - *Wind shelter:* sheltered runners kept passing the runner shielding them (2,876 passes per race). Now the shelter only lets you keep up, and runners move front to back each tick so followers react to the leader's new speed.
+  - *Front Runner duels:* two Front Runners kept fighting back against each other (79 swaps in one race). Now a Front Runner fights until 3 m clear, then won't fight again for 30 s.
+  - Result: about 12–15 passes per race in every condition, never more than about 10 swaps between one pair. A test now guards against this.
+**Next:** Cards.
 
 ---
 

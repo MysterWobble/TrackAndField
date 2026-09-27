@@ -15,6 +15,8 @@ export const STYLES = {
     chaseEffort: 0.5, // how hard they push while fighting back
     chaseMaxMeters: 200, // they give up if they haven't got the position back after this far
     chaseStopsAtStamina: 0.25, // ...or once their stamina drops below 25%
+    chaseUntilAheadMeters: 3, // they keep pushing until they're this far back in front
+    chaseCooldownSeconds: 30, // after a fight, they won't fight back again for this long
   },
 
   pacer: {

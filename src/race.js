@@ -18,6 +18,7 @@ import { staminaUsed } from "./stamina.js";
 import { rollDetermination } from "./determination.js";
 import { planFor, speedBonuses, staminaFactor, wantsToChase, CHASE } from "./styles.js";
 import { STYLES } from "../data/styles.js";
+import { withBonuses } from "./runner.js";
 
 // A pace plan says how hard to run each lap: 0 = average pace, 1 = top speed, 0.5 = halfway between.
 export const PLANS = {
@@ -45,6 +46,7 @@ function createEntrant(runner, isPlayer, plan, rng) {
     kicking: false,
     hasKicked: false, // computer runners only kick once
     chasing: null, // a Front Runner fighting to get a position back: { target, until }
+    noChaseUntil: 0, // race time before which a Front Runner won't fight back again
     kickTiming: isPlayer ? 0 : rng.range(-1, 1) * kickMisjudge(runner), // + means they'll go too early
     reachedPace: false, // true once they first get up to average pace
     nextRollIn: 0, // seconds until the next Determination roll
@@ -56,13 +58,22 @@ function createEntrant(runner, isPlayer, plan, rng) {
   };
 }
 
-export function createRace(player, rivals, rng, plan = PLANS.even) {
+// `condition` is one entry from data/conditions.js (or null for a plain race).
+export function createRace(player, rivals, rng, plan = PLANS.even, condition = null) {
   const dt = tuning.tickSeconds;
   const finishLine = raceMeters();
+  // Race conditions affect everyone, so every runner gets the condition's bonuses.
+  const applyCondition = (runner) => (condition?.bonuses ? withBonuses(runner, condition.bonuses) : runner);
   const entrants = [
-    createEntrant(player, true, plan, rng),
-    ...rivals.map((runner) => createEntrant(runner, false, PLANS.even, rng)),
+    createEntrant(applyCondition(player), true, plan, rng),
+    ...rivals.map((runner) => createEntrant(applyCondition(runner), false, PLANS.even, rng)),
   ];
+
+  // Windy: tailwind on the first half of each lap, headwind on the second half.
+  function windAt(distance) {
+    if (!condition?.wind) return 0;
+    return distance % tuning.lapMeters < tuning.lapMeters / 2 ? condition.wind : -condition.wind;
+  }
 
   // Who's ahead? Finished runners rank by finish time, everyone else by distance.
   function rankKey(entrant) {
@@ -74,14 +85,16 @@ export function createRace(player, rivals, rng, plan = PLANS.even) {
     return keys[i] > keys[j] || (keys[i] === keys[j] && i < j);
   }
 
-  // Meters to the nearest runner ahead (using where everyone was at the start of this tick).
-  function gapAhead(index, startDistances) {
-    let gap = null;
+  // The nearest runner ahead, as a list position (using where everyone was at the start of this tick).
+  function nearestAhead(index, startDistances) {
+    let nearest = null;
     startDistances.forEach((distance, j) => {
       const ahead = distance - startDistances[index];
-      if (j !== index && entrants[j].finishTime === null && ahead > 0 && (gap === null || ahead < gap)) gap = ahead;
+      if (j !== index && entrants[j].finishTime === null && ahead > 0) {
+        if (nearest === null || distance < startDistances[nearest]) nearest = j;
+      }
     });
-    return gap;
+    return nearest;
   }
 
   // Meters to the nearest runner behind.
@@ -111,23 +124,50 @@ export function createRace(player, rivals, rng, plan = PLANS.even) {
     }
 
     // Running style: any speed bonuses right now, and how hard they want to run.
-    const surroundings = { gapAhead: gapAhead(index, startDistances), gapBehind: gapBehind(index, startDistances) };
+    const ahead = nearestAhead(index, startDistances);
+    const surroundings = {
+      gapAhead: ahead === null ? null : startDistances[ahead] - startDistances[index],
+      gapBehind: gapBehind(index, startDistances),
+    };
     const bonus = speedBonuses(e, lapIndex, surroundings);
-    const averageSpeed = runner.averageSpeed * (1 + bonus.speed);
-    const topSpeed = runner.topSpeed * (1 + bonus.speed + bonus.topSpeed);
+
+    // Wind. Tucking in close behind someone blocks most of the headwind.
+    const wind = windAt(e.distance);
+    const sheltered = wind < 0 && surroundings.gapAhead !== null && surroundings.gapAhead <= condition.shelterMeters;
+    const windBonus = sheltered ? wind * (1 - condition.headwindShelter) : wind;
+
+    // Every speed bonus adds together: whole-race ones (conditions), style ones, and the wind.
+    const speedsWith = (windPart) => {
+      const speedBonus = runner.bonuses.speed + bonus.speed + windPart;
+      return {
+        average: runner.baseAverageSpeed * (1 + speedBonus),
+        top: runner.baseTopSpeed * (1 + speedBonus + runner.bonuses.topSpeed + bonus.topSpeed),
+      };
+    };
+    const { average: averageSpeed, top: topSpeed } = speedsWith(windBonus);
     const stylePlan = planFor(e, lapIndex);
 
     if (e.chasing) {
-      const gotItBack = e.distance > e.chasing.target.distance;
+      const gotItBack = e.distance > e.chasing.target.distance + STYLES.frontRunner.chaseUntilAheadMeters;
       const tooTired = e.stamina < STYLES.frontRunner.chaseStopsAtStamina * runner.maxStamina;
-      if (gotItBack || tooTired || e.distance >= e.chasing.until || lapIndex === tuning.laps - 1) e.chasing = null;
+      if (gotItBack || tooTired || e.distance >= e.chasing.until || lapIndex === tuning.laps - 1) {
+        e.chasing = null;
+        e.noChaseUntil = race.time + STYLES.frontRunner.chaseCooldownSeconds;
+      }
     }
 
     let effort = Math.max(e.plan.effort[lapIndex], stylePlan.effort);
     if (e.chasing) effort = Math.max(effort, CHASE.effort);
     if (e.kicking) effort = 1;
     const pace = effort > 0 ? 1 : stylePlan.pace; // hanging back (Closer) only applies when not pushing
-    const targetSpeed = averageSpeed * pace + effort * (topSpeed - averageSpeed);
+    const targetFor = (speeds) => speeds.average * pace + effort * (speeds.top - speeds.average);
+    let targetSpeed = targetFor({ average: averageSpeed, top: topSpeed });
+    if (sheltered) {
+      // Shelter helps you keep up with the runner ahead, not blow past them.
+      // (The runner ahead has already moved this tick, so this is their up-to-date speed.)
+      const exposedTarget = targetFor(speedsWith(wind));
+      targetSpeed = Math.max(exposedTarget, Math.min(targetSpeed, entrants[ahead].speed));
+    }
 
     // 2. Speed up or slow down.
     if (e.stamina <= 0) {
@@ -159,9 +199,10 @@ export function createRace(player, rivals, rng, plan = PLANS.even) {
     const timeAtLapLine = race.time + tickTime * ((lapLineAhead - e.distance) / meters);
 
     // Stamina cost is measured against the runner's speeds right now (including style bonuses).
-    let used = staminaUsed({ ...runner, averageSpeed, topSpeed }, e.speed, meters) * staminaFactor(e, e.speed, averageSpeed);
+    let used = staminaUsed({ ...runner, averageSpeed, topSpeed }, e.speed, meters) * staminaFactor(e, e.speed, averageSpeed, condition);
     const gap = surroundings.gapAhead;
-    if (gap !== null && gap <= tuning.draftingRangeMeters) used *= 1 - tuning.draftingStaminaSaving;
+    const draftingSaving = tuning.draftingStaminaSaving * (condition?.draftingMultiplier ?? 1); // bigger in the wind
+    if (gap !== null && gap <= tuning.draftingRangeMeters) used *= 1 - draftingSaving;
     e.stamina -= used;
     if (e.stamina <= 0) {
       if (e.ranOutAt === null) {
@@ -212,6 +253,7 @@ export function createRace(player, rivals, rng, plan = PLANS.even) {
       frontRunner.runner.style === "frontRunner" &&
       frontRunner.finishTime === null &&
       !frontRunner.chasing &&
+      race.time >= frontRunner.noChaseUntil &&
       frontRunner.stamina > STYLES.frontRunner.chaseStopsAtStamina * frontRunner.runner.maxStamina &&
       lapOf(frontRunner.distance) < tuning.laps - 1;
     if (canChase && wantsToChase(frontRunner, rng)) {
@@ -223,6 +265,8 @@ export function createRace(player, rivals, rng, plan = PLANS.even) {
   const race = {
     entrants,
     player: entrants[0],
+    condition,
+    rival: condition?.rival && entrants.length > 1 ? rng.pick(entrants.slice(1)) : null,
     time: 0,
     finished: false,
     log: [], // everything worth announcing: passes, kicks, Determination, running out
@@ -245,9 +289,11 @@ export function createRace(player, rivals, rng, plan = PLANS.even) {
       const startKeys = entrants.map(rankKey);
       const startLaps = entrants.map((e) => e.laps.length);
 
-      entrants.forEach((e, i) => {
-        if (e.finishTime === null) moveEntrant(e, i, startDistances);
-      });
+      // Move runners front to back, so anyone tucked in behind reacts to the runner ahead's new speed.
+      const frontToBack = entrants.map((_, i) => i).sort((i, j) => startDistances[j] - startDistances[i] || i - j);
+      for (const i of frontToBack) {
+        if (entrants[i].finishTime === null) moveEntrant(entrants[i], i, startDistances);
+      }
       race.time += dt;
 
       // Passes: anyone who was behind someone at the start of the tick and is now ahead.
@@ -275,6 +321,7 @@ export function createRace(player, rivals, rng, plan = PLANS.even) {
         place: i + 1,
         name: e.runner.name,
         isPlayer: e.isPlayer,
+        isRival: e === race.rival,
         style: e.runner.style,
         finishTime: e.finishTime,
       }));

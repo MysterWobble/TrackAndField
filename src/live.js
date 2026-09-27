@@ -66,8 +66,14 @@ export function runLive(race) {
       boxDrawn = false;
     }
 
+    // "Maya", or "your rival Maya" in a Rivalry Race.
+    function nameOf(entrant) {
+      return entrant === race.rival ? `your rival ${entrant.runner.name}` : entrant.runner.name;
+    }
+    const capitalize = (text) => text[0].toUpperCase() + text.slice(1);
+
     function announce(event) {
-      const name = event.entrant.runner.name;
+      const name = capitalize(nameOf(event.entrant));
       const mine = event.entrant === you;
       if (event.type === "pass" && (mine || event.passed === you)) {
         const rival = mine ? event.passed : event.entrant;
@@ -75,7 +81,7 @@ export function runLive(race) {
         if (last !== undefined && event.time - last < PASS_ANNOUNCE_COOLDOWN) return;
         lastPassAnnounced.set(rival, event.time);
         const place = ordinal(race.positionOf(you));
-        say(mine ? `  You pass ${rival.runner.name}! Now ${place}.` : `  ${name} passes you. Now ${place}.`);
+        say(mine ? `  You pass ${nameOf(rival)}! Now ${place}.` : `  ${name} passes you. Now ${place}.`);
       } else if (event.type === "chase" && (mine || event.target === you)) {
         say(mine ? "  Your Front Runner fights to get the position back!" : `  ${name} fights back!`);
       } else if (event.type === "kick") {

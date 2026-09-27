@@ -3,12 +3,13 @@
 //   npm.cmd run race                       -> pick 1 of your 3 runners, race plays live (press K to kick)
 //   npm.cmd run race -- 12345              -> replay seed 12345
 //   npm.cmd run race -- 12345 --runner 2   -> skip the question and race with runner 2
+//   npm.cmd run race -- 12345 --condition rain -> force a condition: hot, windy, fastTrack, rivalry, rain, none
 //   npm.cmd run race -- 12345 --instant    -> skip the live view, just print the results
 //   npm.cmd run race -- 12345 --fast-start -> your runner also sprints lap 1 (for testing)
 //   npm.cmd run race -- 12345 --det 0      -> set your Determination to 0 (for testing)
 //   npm.cmd run race -- 12345 --solo       -> race alone, no computer runners
 //
-// So far: your 3 runners with running styles + 7 computer runners. No cards or race conditions yet.
+// So far: race conditions, your 3 runners with running styles, and 7 computer runners. No cards yet.
 
 import readline from "node:readline/promises";
 import { createRandom, newSeed } from "./random.js";
@@ -18,11 +19,13 @@ import { createRace, PLANS } from "./race.js";
 import { runLive } from "./live.js";
 import { formatTime, ordinal } from "./units.js";
 import { STYLES } from "../data/styles.js";
+import { CONDITIONS, CONDITION_KEYS } from "../data/conditions.js";
 import { tuning } from "../data/tuning.js";
 
 let seedArg;
 let detArg;
 let runnerArg;
+let conditionArg;
 let instant = false;
 let solo = false;
 let plan = PLANS.even;
@@ -33,6 +36,7 @@ for (let i = 0; i < args.length; i++) {
   else if (args[i] === "--solo") solo = true;
   else if (args[i] === "--det") detArg = args[++i];
   else if (args[i] === "--runner") runnerArg = args[++i];
+  else if (args[i] === "--condition") conditionArg = args[++i];
   else seedArg = args[i];
 }
 
@@ -50,11 +54,21 @@ if (runnerArg !== undefined && !["1", "2", "3"].includes(runnerArg)) {
   process.exit(1);
 }
 
+if (conditionArg !== undefined && conditionArg !== "none" && !CONDITION_KEYS.includes(conditionArg)) {
+  console.log(`--condition needs one of: ${[...CONDITION_KEYS, "none"].join(", ")}`);
+  process.exit(1);
+}
+
 const hasKeyboard = Boolean(process.stdin.isTTY);
 const rng = createRandom(seed);
 const yourRunners = makeYourRunners(rng);
+const conditionKey = conditionArg ?? rng.pick(CONDITION_KEYS);
+const condition = conditionKey === "none" ? null : CONDITIONS[conditionKey];
 
 console.log(`Seed: ${seed}\n`);
+console.log(`TODAY'S CONDITIONS: ${condition ? condition.name.toUpperCase() : "NONE"}`);
+if (condition) console.log(`  ${condition.description}`);
+console.log("");
 console.log("YOUR RUNNERS");
 yourRunners.forEach((r, i) => {
   console.log(`  ${i + 1}. ${STYLES[r.style].name.toUpperCase()}`);
@@ -71,13 +85,15 @@ if (detArg !== undefined) runner = buildRunner("You", { ...runner.points, determ
 console.log(`You picked runner ${choice}: the ${STYLES[runner.style].name}.`);
 
 const rivals = solo ? [] : makeField(runner.points, rng);
-const race = createRace(runner, rivals, rng, plan);
+const race = createRace(runner, rivals, rng, plan, condition);
 
 if (rivals.length) {
   console.log("\nTHE FIELD (style · stat points · average pace)");
-  for (const r of [runner, ...rivals]) {
+  for (const e of race.entrants) {
+    const r = e.runner;
+    const rivalTag = e === race.rival ? "  <-- your rival" : "";
     console.log(
-      `  ${r.name.padEnd(8)} ${STYLES[r.style].name.padEnd(13)} ${totalPoints(r.points)} pts · ${formatTime(r.averagePace)}`,
+      `  ${r.name.padEnd(8)} ${STYLES[r.style].name.padEnd(13)} ${totalPoints(r.points)} pts · ${formatTime(r.averagePace)}${rivalTag}`,
     );
   }
 }
@@ -142,7 +158,7 @@ function printResults() {
   console.log("\nRESULTS");
   for (const r of results) {
     const gap = r.place === 1 ? "" : `+${(r.finishTime - winnerTime).toFixed(1)}`;
-    const marker = r.isPlayer ? "  <-- you" : "";
+    const marker = r.isPlayer ? "  <-- you" : r.isRival ? "  <-- your rival" : "";
     console.log(
       `  ${ordinal(r.place).padEnd(4)} ${r.name.padEnd(8)} ${STYLES[r.style].name.padEnd(13)} ${formatTime(r.finishTime)}  ${gap.padStart(6)}${marker}`,
     );

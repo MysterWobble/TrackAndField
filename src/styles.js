@@ -49,10 +49,10 @@ export function speedBonuses(entrant, lapIndex, surroundings) {
   return { speed: 0, topSpeed: 0 };
 }
 
-// Multiplier on stamina used this tick (0.9 = uses 10% less).
-export function staminaFactor(entrant, speed, averageSpeed) {
+// Multiplier on stamina used this tick (0.9 = uses 10% less). Hot days boost the Pacer's saving.
+export function staminaFactor(entrant, speed, averageSpeed, condition) {
   if (entrant.runner.style === "pacer" && speed <= averageSpeed + 1e-9) {
-    return 1 - pacer.staminaSavingAtPace;
+    return 1 - pacer.staminaSavingAtPace * (condition?.pacerSavingMultiplier ?? 1);
   }
   return 1;
 }
