@@ -1,7 +1,10 @@
 // Entry point for `npm.cmd run race`.
 //
-//   npm.cmd run race                            -> the full race: conditions, pick a runner, cards, race live (K = kick)
-//   npm.cmd run race -- 12345                   -> replay seed 12345
+//   npm.cmd run race                            -> a CAREER race with your saved runners (saved, earns a training point)
+//   npm.cmd run race -- --new                   -> start a new career (your old one is kept as a backup file)
+//
+// Everything below is a PRACTICE race (not saved), for testing and trying things out:
+//   npm.cmd run race -- 12345                   -> replay seed 12345 (a fresh set of runners from that seed)
 //   npm.cmd run race -- 12345 --runner 2        -> skip the question and race with runner 2
 //   npm.cmd run race -- 12345 --condition rain  -> force a condition: hot, windy, fastTrack, rivalry, rain, none
 //   npm.cmd run race -- 12345 --picks 2,1,3,1   -> choose cards ahead of time (pre-race, after lap 1, 2, 3)
@@ -23,14 +26,21 @@ import { offerLines, pickPrompt } from "./cardScreen.js";
 import { CARDS } from "../data/cards.js";
 import { STYLES } from "../data/styles.js";
 import { CONDITIONS, CONDITION_KEYS } from "../data/conditions.js";
+import { TRAINING } from "../data/training.js";
 import { tuning } from "../data/tuning.js";
+import { backupCareer, checkTraining, loadCareer, newCareer, recordRace, runnerFromCareer, saveCareer } from "./career.js";
+import { newBestLines, personalBestLines, runnerLines, spendTrainingPoints } from "./careerScreen.js";
 
-// Check the card file before anything else, so mistakes get explained instead of crashing mid-race.
-const cardProblems = checkCards(CARDS);
-if (cardProblems.length) {
-  console.log("There's a problem in data/cards.js:\n");
-  for (const problem of cardProblems) console.log(`  - ${problem}`);
-  process.exit(1);
+// Check the card and training files before anything else, so mistakes get explained instead of crashing mid-race.
+for (const [file, problems] of [
+  ["data/cards.js", checkCards(CARDS)],
+  ["data/training.js", checkTraining(TRAINING)],
+]) {
+  if (problems.length) {
+    console.log(`There's a problem in ${file}:\n`);
+    for (const problem of problems) console.log(`  - ${problem}`);
+    process.exit(1);
+  }
 }
 
 let seedArg;
@@ -41,10 +51,12 @@ let picksArg;
 let giveArg;
 let instant = false;
 let solo = false;
+let startNewCareer = false;
 let plan = PLANS.even;
 const args = process.argv.slice(2);
 for (let i = 0; i < args.length; i++) {
-  if (args[i] === "--fast-start") plan = PLANS.fastStart;
+  if (args[i] === "--new") startNewCareer = true;
+  else if (args[i] === "--fast-start") plan = PLANS.fastStart;
   else if (args[i] === "--instant") instant = true;
   else if (args[i] === "--solo") solo = true;
   else if (args[i] === "--det") detArg = args[++i];
@@ -84,8 +96,28 @@ if (giveArg !== undefined && !givenCard) {
 }
 
 const hasKeyboard = Boolean(process.stdin.isTTY);
+
+// Career race or practice? Practice = anything that bends the rules or can't be played properly.
+const testingFlags = detArg !== undefined || giveArg !== undefined || conditionArg !== undefined || solo || plan !== PLANS.even;
+const practice = seedArg !== undefined || instant || !hasKeyboard || testingFlags;
+let career = null;
+if (!practice) {
+  if (startNewCareer) {
+    const backup = backupCareer();
+    if (backup) console.log(`Starting a new career. Your old one is kept in ${backup}\n`);
+  }
+  career = loadCareer();
+  if (!career) {
+    career = newCareer(newSeed());
+    saveCareer(career);
+    console.log("WELCOME TO YOUR CAREER! Here are your 3 runners. They're saved, and they'll get better as you train.\n");
+  }
+} else if (startNewCareer) {
+  console.log("(--new only works for a career race, so your career wasn't changed.)\n");
+}
+
 const rng = createRandom(seed);
-const yourRunners = makeYourRunners(rng);
+const yourRunners = career ? career.runners.map((_, i) => runnerFromCareer(career, i)) : makeYourRunners(rng);
 const conditionKey = conditionArg ?? rng.pick(CONDITION_KEYS);
 const condition = conditionKey === "none" ? null : CONDITIONS[conditionKey];
 
@@ -93,12 +125,19 @@ const condition = conditionKey === "none" ? null : CONDITIONS[conditionKey];
 // cards no matter what happened earlier in the race (that keeps the Daily Race fair).
 const cardRandom = (moment) => createRandom(seed * 1000 + moment + 7);
 
-console.log(`Seed: ${seed}\n`);
+console.log(career ? "CAREER RACE" : `PRACTICE RACE (not saved) · Seed: ${seed}`);
+if (career) for (const line of personalBestLines(career)) console.log(line);
+console.log("");
 console.log(`TODAY'S CONDITIONS: ${condition ? condition.name.toUpperCase() : "NONE"}`);
 if (condition) console.log(`  ${condition.description}`);
 console.log("");
 console.log("YOUR RUNNERS");
 yourRunners.forEach((r, i) => {
+  if (career) {
+    for (const line of runnerLines(career, i)) console.log(line);
+    console.log("");
+    return;
+  }
   console.log(`  ${i + 1}. ${STYLES[r.style].name.toUpperCase()}`);
   console.log("     " + STAT_NAMES.map((stat) => `${STAT_LABELS[stat]} ${r.points[stat]}`).join(" · "));
   console.log(
@@ -168,6 +207,36 @@ if (instant) {
     takeCard: (card, moment, say) => takeCard(card, moment, say),
   });
   if (finished) printResults();
+  if (finished && career) await finishCareerRace();
+}
+
+// Career: save the race, check personal bests, and spend the training point.
+async function finishCareerRace() {
+  const you = race.player;
+  const result = recordRace(career, {
+    seed,
+    runner: choice - 1,
+    style: runner.style,
+    condition: conditionKey,
+    rain: Boolean(condition?.separatePersonalBest),
+    time: you.finishTime,
+    place: race.positionOf(you),
+    fieldSize: race.entrants.length,
+    cards: you.cards.map((held) => held.card.name),
+  });
+  saveCareer(career);
+  console.log("");
+  for (const line of newBestLines(result, you.finishTime)) console.log(line);
+  console.log(`  You earned a training point.`);
+
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  await spendTrainingPoints(
+    career,
+    (question) => rl.question(question),
+    (n) => createRandom(career.seed * 31 + n),
+    () => saveCareer(career),
+  );
+  rl.close();
 }
 
 // Gives the player a card and shows what happened.

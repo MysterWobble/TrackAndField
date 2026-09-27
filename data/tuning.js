@@ -76,6 +76,12 @@ export const tuning = {
   rareCardWeight: 1 / 3, // Rivalry and Unique cards show up a third as often as normal cards
   tripFallSeconds: 1, // "I won't stop here": how long you're down after tripping (then you have to get back up to speed)
 
+  // --- Training (between races) ---
+  trainingPointsPerRace: 1, // every finished career race earns this many training points
+  trainingChoices: 3, // how many sessions you get to choose from
+  trainingDeterminationChance: 0.15, // every session has this chance of a bonus...
+  trainingDeterminationBonus: 2, // ...of this many Determination points
+
   // --- Simulation ---
   tickSeconds: 0.1, // the sim moves everyone forward in steps this long
   liveSpeedup: 7, // the live race plays this many times faster than real life (a 1:40 lap takes ~14 seconds)

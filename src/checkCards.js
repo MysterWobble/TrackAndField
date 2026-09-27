@@ -16,7 +16,7 @@ function distance(a, b) {
   return rows[a.length][b.length];
 }
 
-function didYouMean(word, options) {
+export function didYouMean(word, options) {
   const shortFor = options.find((option) => String(word).length >= 3 && option.toLowerCase().startsWith(String(word).toLowerCase()));
   if (shortFor) return ` Did you mean "${shortFor}"?`;
   const best = options

@@ -101,6 +101,16 @@ Short entries, every session. This becomes the portfolio and essay material.
 - Side effect: drifting fast now costs stamina, so Race IQ is worth more. +10 points now = Speed 4.8 s, Top Speed 2.7 s, Race IQ 2.7 s, Determination 2.7 s, Kick 1.9 s, Stamina 1.5 s. Winning times are ~9 s slower (~6:34).
 **Next:** Playtest. Closers are the weakest style in most conditions; Stamina is now the weakest stat.
 
+## 2026-09-26 (night): PLAN step 4, training and saving
+**Decisions made (and why):**
+- **Training points:** every finished career race earns 1 training point. Spend it on **any** of your 3 runners (the designers' idea, so you can build up a runner you don't race yet), or bank it for later.
+- **Sessions:** spending a point offers 3 random sessions from `data/training.js` (10 starter sessions by Claude, covering all 6 stats, one with a tradeoff). Each gives about +3 stat points, with a 15% chance of a +2 Determination bonus. Training can push stats past the starting cap of 35.
+- **Saving:** your career (3 runners, every race, training history, banked points) is saved in `save/career.json`, which stays on your computer (ignored by git). `--new` starts over and keeps the old career as a backup file.
+- **Personal bests:** overall, per runner, and a separate rain best.
+- **Career vs practice:** a plain `npm.cmd run race` is a saved career race. A seed, `--instant`, or testing flags make it a practice race that isn't saved, so testing never affects your career.
+- **`npm.cmd run career`:** shows your runners, personal bests and recent races, and lets you spend banked points.
+**Next:** Play a few career races and see how fast personal bests come.
+
 ---
 
 ## Milestones
