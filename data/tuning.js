@@ -22,6 +22,8 @@ export const tuning = {
   drainPerLapAtAveragePace: 25,
   extraDrainPerLapPerStaminaPoint: 0.0625, // with 1.25 per point, each Stamina point is worth 1 spare stamina over a race
   drainMultiplierAtTopSpeed: 2.5, // running at top speed drains this many times faster than average pace...
+  surgeDrain: 6, // running above your normal pace without kicking (surging, fighting back, drifting fast): every 1% faster uses 6% more stamina
+  drainCurvePower: 2, // shape of the cost between average pace and top speed (2 = small pushes are cheap, 1 = even, 0.5 = any push costs a lot)
   pushSpeedDrain: 3, // speed from cards is you pushing harder: every 1% faster uses 3% more stamina (new shoes excepted)
   kickSprintSavingPerPoint: 0.02, // ...minus this much per Kick point (strong kickers sprint more efficiently: 25 Kick -> 2.0)
   lowestSprintDrain: 1.5, // ...but never less than this

@@ -279,7 +279,10 @@ export function createRace(player, rivals, rng, plan = PLANS.even, condition = n
     // Stamina cost is measured against the runner's speeds right now (including style bonuses).
     // Card speed ("pushSpeed") is you pushing harder: every 1% faster costs pushSpeedDrain% more stamina.
     const pushCost = 1 + runner.bonuses.pushSpeed * tuning.pushSpeedDrain;
-    let used = staminaUsed({ ...runner, averageSpeed, topSpeed }, e.speed, meters) * staminaFactor(e, e.speed, averageSpeed, condition) * pushCost;
+    // Running above your normal pace WITHOUT kicking (a Front Runner surge, fighting back, drifting fast) costs extra too.
+    const flatOut = e.kicking || effort >= 1; // a full sprint is a kick, and kicks already cost plenty
+    const surgeCost = flatOut ? 1 : 1 + Math.max(0, e.speed / averageSpeed - 1) * tuning.surgeDrain;
+    let used = staminaUsed({ ...runner, averageSpeed, topSpeed }, e.speed, meters) * staminaFactor(e, e.speed, averageSpeed, condition) * pushCost * surgeCost;
     const gap = surroundings.gapAhead;
     const draftingSaving = tuning.draftingStaminaSaving * (condition?.draftingMultiplier ?? 1); // bigger in the wind
     if (gap !== null && gap <= tuning.draftingRangeMeters) used *= 1 - draftingSaving;

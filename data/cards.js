@@ -146,8 +146,9 @@ export const CARDS = [
     name: "I want you on his back!",
     type: "Pacing",
     when: "after lap 1-3",
-    text: "Match the speed of the runner ahead, even past your top speed (never slower than your normal pace). Ends when your stamina runs out.",
+    text: "Match the speed of the runner ahead, even past your top speed (never slower than your normal pace). Ends when your stamina runs out. Only when you're 2nd or worse.",
     rivalryOnly: true,
+    minPosition: 2,
     special: "onHisBack",
   },
   {

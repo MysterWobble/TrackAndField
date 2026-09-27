@@ -19,7 +19,7 @@ export function effortMultiplier(runner, speed) {
   }
   // 0 at average pace, 1 at top speed (and above 1 if something pushes you past top speed)
   const closenessToTop = (speed - runner.averageSpeed) / (runner.topSpeed - runner.averageSpeed);
-  return 1 + (runner.sprintDrain - 1) * closenessToTop ** 2;
+  return 1 + (runner.sprintDrain - 1) * closenessToTop ** tuning.drainCurvePower;
 }
 
 // Stamina used while running `meters` at `speed` mph.

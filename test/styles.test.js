@@ -51,10 +51,11 @@ test("Front Runner: fast first lap, and more Race IQ means a smaller surge", () 
 });
 
 test("Front Runner with 0 Race IQ fights back when passed", () => {
-  // The Front Runner surges ahead on lap 1, then a much faster runner catches and passes them on lap 2 or 3.
+  // The Front Runner starts a little ahead, then a much faster runner catches and passes them.
   const frontRunner = buildRunner("FR", { ...stats, speed: 0, raceIQ: 0 }, "frontRunner");
   const faster = buildRunner("Fast", { ...stats, speed: 35, topSpeed: 35, raceIQ: 50 });
   const race = createRace(frontRunner, [faster], createRandom(1));
+  race.player.distance = 15;
   while (!race.finished) race.step();
   const chases = race.log.filter((e) => e.type === "chase");
   assert.ok(chases.length > 0 && chases[0].entrant.isPlayer);

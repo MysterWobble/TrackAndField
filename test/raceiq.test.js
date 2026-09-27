@@ -43,9 +43,9 @@ test("after being passed, a runner settles in behind instead of passing straight
         (p) => p.entrant === pass.passed && p.passed === pass.entrant && p.time > pass.time && p.time - pass.time < 1,
       );
       if (!passBack) continue;
-      // Allowed: a Front Runner fighting back, or a runner who has started their kick.
+      // Allowed: a Front Runner fighting back (a fight can last up to 200 m, so look back a minute), or a runner kicking.
       const foughtBack = race.log.some(
-        (e) => e.type === "chase" && e.entrant === passBack.entrant && e.time >= pass.time - 1e-9 && e.time <= passBack.time,
+        (e) => e.type === "chase" && e.entrant === passBack.entrant && e.time <= passBack.time && e.time >= passBack.time - 60,
       );
       const kicking = race.log.some((e) => e.type === "kick" && e.entrant === passBack.entrant && e.time <= passBack.time);
       assert.ok(foughtBack || kicking, `seed ${seed}: passed straight back`);

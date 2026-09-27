@@ -91,6 +91,16 @@ Short entries, every session. This becomes the portfolio and essay material.
 - **New tool:** `npm run balance` prints both tables, and `--try '{...}'` tests tuning numbers without editing files.
 **Next:** Playtest. Possibly buff Race IQ cards and look at why Front Runners win (leading avoids traffic mistakes).
 
+## 2026-09-26 (evening): Front Runner fix, card bug
+**Playtest bug:** "I want you on his back!" was offered while in 1st, where it does nothing (nobody ahead to follow). It now requires 2nd or worse, and a test guards it.
+**Front Runner investigation:** racing the same runner as each style showed the lap-1 surge was almost the entire Front Runner edge (6.6 s with it, 0.6 s without). Traffic mistakes and fighting back barely mattered. The surge was nearly free: after the rebalance, top speed sits ~45% above normal pace, and the stamina curve only charges for closeness to top speed, so a 6% surge cost under 1 stamina. The other styles all have a real downside, but the Front Runner's (fighting back) rarely triggered because nobody passes the leader. Several guesses were tested and ruled out along the way (leftover stamina, Determination refunds, curve shape).
+**Fix:**
+- New rule: running above normal pace **without kicking** (surging, fighting back, drifting fast from low Race IQ) costs 6% more stamina per 1% faster. Full sprints count as kicks.
+- Front Runner lap-1 surge 0.2 → 0.07 (about 2% faster).
+- Result for your runner (same stats, only the style changes): Front Runner 6:42.4, Pacer 6:42.6, Competitor 6:43.5, Closer 6:43.9, all within 1.5 s (was an 8 s Front Runner edge). Computer Front Runners average 3.4–3.8 place vs 3.6–4.9 for the others. Hot days still favor Pacers and windy days Closers. Passing stays healthy (no loops).
+- Side effect: drifting fast now costs stamina, so Race IQ is worth more. +10 points now = Speed 4.8 s, Top Speed 2.7 s, Race IQ 2.7 s, Determination 2.7 s, Kick 1.9 s, Stamina 1.5 s. Winning times are ~9 s slower (~6:34).
+**Next:** Playtest. Closers are the weakest style in most conditions; Stamina is now the weakest stat.
+
 ---
 
 ## Milestones

@@ -189,6 +189,17 @@ test("I want you on his back!: rivalry only, matches the runner ahead past your 
   assert.equal(race.player.cardFlags.matchRunnerAhead, false, "over once stamina runs out");
 });
 
+test("I want you on his back! is never offered in 1st (there's nobody ahead to follow)", () => {
+  const you = buildRunner("You", steady);
+  const slow = buildRunner("Slow", { ...steady, speed: 0 });
+  const race = createRace(you, [slow], createRandom(1), undefined, CONDITIONS.rivalry);
+  while (race.player.laps.length < 1) race.step();
+  assert.equal(race.positionOf(race.player), 1);
+  for (let seed = 1; seed <= 50; seed++) {
+    assert.equal(race.offerCards(1, createRandom(seed)).some((c) => c.name === "I want you on his back!"), false);
+  }
+});
+
 test("Flow State needs the same position for two laps; it hides your stats", () => {
   const race = soloWith(["Flow State"]);
   race.step();
