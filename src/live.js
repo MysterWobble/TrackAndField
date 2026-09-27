@@ -1,0 +1,205 @@
+// The live race view: plays the race out in the terminal and listens for keys.
+//
+//   K = start kicking / stop kicking
+//   1, 2, 3 = pick a card (the race pauses after laps 1-3 for this)
+//   Q = quit
+//
+// About 20 times a second it moves the race forward a few ticks and redraws a small
+// status box at the bottom. Things worth keeping (lap splits, passes, kicks, Determination)
+// get printed above the box so they stay on screen.
+
+import { tuning } from "../data/tuning.js";
+import { formatTime, ordinal, raceMeters } from "./units.js";
+import { offerLines, pickPrompt } from "./cardScreen.js";
+
+const FRAME_MS = 50;
+const BOX_LINES = 6;
+const PASS_ANNOUNCE_COOLDOWN = 3; // seconds of race time before announcing the same two runners swapping again
+const HOT_ICE_FUZZ = 30; // HotIce: the pace readout can be up to this many seconds off
+
+// ▕██████░░░░░░▏ style bar. `fraction` is 0 to 1.
+function bar(fraction, width = 24) {
+  const filled = Math.round(Math.max(0, Math.min(1, fraction)) * width);
+  return "▕" + "█".repeat(filled) + "░".repeat(width - filled) + "▏";
+}
+
+// `cards` = { offerCards(moment), presetPick(moment), takeCard(card, moment, say) } from main.js
+export function runLive(race, cards) {
+  return new Promise((resolve) => {
+    const you = race.player;
+    const out = process.stdout;
+    let boxDrawn = false;
+    let lapsPrinted = 0;
+    let logPrinted = 0;
+    let lapsOffered = 0; // laps we've already paused after for a card pick
+    let picking = null; // { offer, moment } while waiting for 1/2/3
+    let paceFuzz = 0; // HotIce: how far off the pace readout is this lap (display only)
+    let tickBank = 0; // leftover fraction of a tick carried to the next frame
+    const lastPassAnnounced = new Map(); // rival -> race time of the last pass announcement
+
+    function neighborsText() {
+      const order = race.standings();
+      const place = order.indexOf(you);
+      const parts = [`Position ${ordinal(place + 1)} of ${order.length}`];
+      const ahead = order[place - 1];
+      const behind = order[place + 1];
+      if (ahead) parts.push(`▲ ${ahead.runner.name} ${Math.round(ahead.distance - you.distance)} m ahead`);
+      if (behind) parts.push(`▼ ${behind.runner.name} ${Math.round(you.distance - behind.distance)} m behind`);
+      return parts.join("    ");
+    }
+
+    // Projected 1600 m time at the pace so far. HotIce makes it unreliable.
+    function paceText() {
+      if (you.distance < 50) return "Pace   --";
+      const projected = (race.time / you.distance) * raceMeters();
+      const shown = you.cardFlags.paceFuzz ? projected + paceFuzz : projected;
+      return `Pace   ${formatTime(shown)} for 1600 m${you.cardFlags.paceFuzz ? " (HotIce: unreliable)" : ""}`;
+    }
+
+    function drawBox() {
+      const runner = you.runner; // read fresh every frame: cards change your stats mid-race
+      const hidden = you.cardFlags.hideStats; // Flow State
+      const kickText = picking
+        ? `Race paused: pick a card. ${pickPrompt(picking.offer.length)}`
+        : you.kicking
+          ? ">>> KICKING <<<  (press K to ease off)"
+          : you.stamina <= 0
+            ? "too tired to kick"
+            : "press K to kick";
+      const lines = [
+        `  Lap ${Math.min(Math.floor(you.distance / tuning.lapMeters) + 1, tuning.laps)} of ${tuning.laps}  ${bar(you.distance / raceMeters())}  ${Math.round(you.distance)} m   ${formatTime(race.time)}`,
+        `  ${neighborsText()}`,
+        hidden
+          ? "  Speed   ???   (Flow State)"
+          : `  Speed   ${you.speed.toFixed(2)} mph   (average ${runner.averageSpeed.toFixed(2)} · top ${runner.topSpeed.toFixed(2)})`,
+        hidden
+          ? "  Stamina ???"
+          : `  Stamina ${bar(you.stamina / runner.maxStamina)}  ${Math.round(you.stamina)} / ${Math.round(runner.maxStamina)}`,
+        `  ${paceText()}      Cards: ${you.cards.length}`,
+        `  ${kickText}      Q = quit`,
+      ];
+      out.write(lines.map((line) => "\x1b[2K" + line).join("\n") + "\n");
+      boxDrawn = true;
+    }
+
+    // Prints a line above the status box so it stays on screen.
+    function say(text) {
+      if (boxDrawn) out.write(`\x1b[${BOX_LINES}A\x1b[0J`); // move up over the box and erase it
+      out.write(text + "\n");
+      boxDrawn = false;
+    }
+
+    // "Maya", or "your rival Maya" in a Rivalry Race.
+    function nameOf(entrant) {
+      return entrant === race.rival ? `your rival ${entrant.runner.name}` : entrant.runner.name;
+    }
+    const capitalize = (text) => text[0].toUpperCase() + text.slice(1);
+
+    function announce(event) {
+      const name = capitalize(nameOf(event.entrant));
+      const mine = event.entrant === you;
+      if (event.type === "pass" && (mine || event.passed === you)) {
+        const rival = mine ? event.passed : event.entrant;
+        const last = lastPassAnnounced.get(rival);
+        if (last !== undefined && event.time - last < PASS_ANNOUNCE_COOLDOWN) return;
+        lastPassAnnounced.set(rival, event.time);
+        const place = ordinal(race.positionOf(you));
+        say(mine ? `  You pass ${nameOf(rival)}! Now ${place}.` : `  ${name} passes you. Now ${place}.`);
+      } else if (event.type === "chase" && (mine || event.target === you)) {
+        say(mine ? "  Your Front Runner fights to get the position back!" : `  ${name} fights back!`);
+      } else if (event.type === "boxed" && mine) {
+        say("  You're boxed in! Stuck behind the runner ahead for a moment.");
+      } else if (event.type === "kick") {
+        say(`  ${name} starts kicking!`);
+      } else if (event.type === "ranOut") {
+        say(mine ? "  You're out of stamina! Fading..." : `  ${name} is out of stamina!`);
+      } else if (event.type === "determination" && mine) {
+        say(`  Determination kicks in! +${event.bonus.toFixed(1)} stamina`);
+      }
+    }
+
+    function printNewThings() {
+      while (logPrinted < race.log.length) announce(race.log[logPrinted++]);
+      while (lapsPrinted < you.laps.length) {
+        const lap = you.laps[lapsPrinted++];
+        say(`  Lap ${lap.lap}:  ${formatTime(lap.lapTime)}   (split ${formatTime(lap.split)})   ${ordinal(lap.position)}`);
+      }
+    }
+
+    function redraw() {
+      if (boxDrawn) out.write(`\x1b[${BOX_LINES}A`);
+      drawBox();
+    }
+
+    // After laps 1-3: pause and offer cards.
+    function startPick(moment) {
+      paceFuzz = (Math.random() * 2 - 1) * HOT_ICE_FUZZ; // HotIce readout changes every lap (screen only, not the race)
+      const offer = cards.offerCards(moment);
+      if (!offer.length) return;
+      for (const line of offerLines(offer, moment, race.positionOf(you))) say(line);
+      picking = { offer, moment };
+      const preset = cards.presetPick(moment);
+      if (preset !== undefined) finishPick(Math.min(preset, offer.length - 1));
+    }
+
+    function finishPick(index) {
+      const { offer, moment } = picking;
+      picking = null;
+      cards.takeCard(offer[index], moment, say);
+      say("");
+    }
+
+    function stop(finished) {
+      clearInterval(timer);
+      process.stdin.setRawMode(false);
+      process.stdin.pause();
+      process.stdin.removeListener("data", onKey);
+      if (finished) {
+        say(`\n  You finish ${ordinal(race.positionOf(you))} in ${formatTime(you.finishTime)}!`);
+        while (!race.finished) race.step(); // let everyone else finish instantly
+      }
+      resolve({ finished });
+    }
+
+    function onKey(key) {
+      if (picking) {
+        const index = Number(key) - 1;
+        if (index >= 0 && index < picking.offer.length) finishPick(index);
+      } else if (key === "k" || key === "K") {
+        if (you.stamina > 0) you.kicking = !you.kicking;
+      }
+      if (key === "q" || key === "Q" || key === "\u0003") {
+        // \u0003 is Ctrl+C
+        say("\n  Race stopped.");
+        stop(false);
+      }
+    }
+
+    process.stdin.setRawMode(true); // get each key press right away, without waiting for Enter
+    process.stdin.setEncoding("utf8");
+    process.stdin.on("data", onKey);
+    process.stdin.resume();
+
+    const timer = setInterval(() => {
+      if (!picking) {
+        tickBank += ((FRAME_MS / 1000) * tuning.liveSpeedup) / tuning.tickSeconds;
+        while (tickBank >= 1 && you.finishTime === null) {
+          race.step();
+          tickBank -= 1;
+          if (you.laps.length > lapsOffered) break; // stop right at the lap line
+        }
+        printNewThings();
+        if (you.laps.length > lapsOffered) {
+          lapsOffered = you.laps.length;
+          tickBank = 0;
+          if (lapsOffered < tuning.laps) startPick(lapsOffered);
+        }
+      }
+      redraw();
+      if (you.finishTime !== null) stop(true);
+    }, FRAME_MS);
+
+    say("");
+    drawBox();
+  });
+}

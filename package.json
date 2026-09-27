@@ -1,0 +1,14 @@
+{
+  "name": "track-and-field",
+  "version": "0.1.0",
+  "description": "1600m roguelike race manager — text-only race simulation",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "race": "node src/main.js",
+    "career": "node src/careerMain.js",
+    "balance": "node src/balance.js",
+    "check:determination": "node src/check-determination.js",
+    "test": "node --test"
+  }
+}
