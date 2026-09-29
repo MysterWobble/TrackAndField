@@ -4,15 +4,9 @@ import { STYLES } from "../data/styles.js";
 import { tuning } from "../data/tuning.js";
 import { STAT_LABELS, STAT_NAMES } from "./runner.js";
 import { formatTime } from "./units.js";
-import { applyTraining, offerTraining, personalBest, runnerFromCareer } from "./career.js";
+import { applyTraining, gainsText, newBestLines as bestLines, offerTraining, personalBest, runnerFromCareer } from "./career.js";
 
-// "+3 Speed, -1 Stamina"
-export function gainsText(gains) {
-  return Object.entries(gains)
-    .filter(([, amount]) => amount !== 0)
-    .map(([stat, amount]) => `${amount > 0 ? "+" : ""}${amount} ${STAT_LABELS[stat]}`)
-    .join(", ");
-}
+export { gainsText };
 
 export function runnerLines(career, index) {
   const r = runnerFromCareer(career, index);
@@ -36,16 +30,9 @@ export function personalBestLines(career) {
   ];
 }
 
-// After a race: which personal bests fell?
+// After a race: which personal bests fell? (indented for the terminal)
 export function newBestLines(result, time) {
-  const where = result.rain ? "RAIN " : "";
-  if (result.overall && result.previousOverall === null) return [`  Your first ${where.toLowerCase()}race on record: ${formatTime(time)} is your ${where.toLowerCase()}personal best!`];
-  if (result.overall) {
-    return [`  *** NEW ${where}PERSONAL BEST! ${formatTime(time)} (was ${formatTime(result.previousOverall)}, ${(result.previousOverall - time).toFixed(1)}s faster) ***`];
-  }
-  if (result.runner && result.previousRunner === null) return [`  First ${where.toLowerCase()}race for this runner: ${formatTime(time)} is their best.`];
-  if (result.runner) return [`  New best for this runner: ${formatTime(time)} (was ${formatTime(result.previousRunner)}).`];
-  return [`  No personal best this time (${where.toLowerCase()}best is ${formatTime(result.previousOverall)}).`];
+  return bestLines(result, time).map((line) => `  ${line}`);
 }
 
 // Spend training points on any runner. `ask(question)` returns what the player typed,
