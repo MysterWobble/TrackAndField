@@ -61,8 +61,8 @@ export const CARDS = [
     name: "Team Pep-Talk",
     type: "Preparation",
     when: "pre-race",
-    text: "+10 Determination on lap 1, +20 on lap 2, +30 on lap 3, +40 on lap 4.",
-    special: "teamPepTalk",
+    text: "+10 Determination on every lap.",
+    effects: { determination: 10 },
   },
 
   // ---------- AFTER A LAP ----------

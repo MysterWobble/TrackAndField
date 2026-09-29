@@ -160,13 +160,13 @@ test("You're our scorer! and state: Determination changes as you pass and get pa
   assert.ok(close(race.player.runner.determination, 30 + 25 + 5 - 10));
 });
 
-test("Team Pep-Talk: Determination goes up every lap", () => {
+test("Team Pep-Talk: +10 Determination on every lap, without building up", () => {
   const race = soloWith(["Team Pep-Talk"]);
   race.step();
   assert.ok(close(race.player.runner.determination, 40), "+10 on lap 1");
   while (race.player.laps.length < 3) race.step();
   race.step();
-  assert.ok(close(race.player.runner.determination, 70), "+40 on lap 4");
+  assert.ok(close(race.player.runner.determination, 40), "still +10 on lap 4");
 });
 
 test("I want you on his back!: rivalry only, matches the runner ahead past your top speed, ends at 0 stamina", () => {
