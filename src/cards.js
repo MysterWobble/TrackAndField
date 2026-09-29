@@ -38,10 +38,6 @@ function passesTakenSince(race, you, time) {
   return race.log.filter((e) => e.type === "pass" && e.passed === you && e.time >= time).length;
 }
 
-function currentLap(you) {
-  return Math.min(you.laps.length + 1, tuning.laps);
-}
-
 // --- Special conditions a card can require before it's offered ("requires" in data/cards.js) ---
 
 export const REQUIREMENTS = {
@@ -74,10 +70,6 @@ export const REQUIREMENTS = {
 
 export const SPECIALS = {
   hotIce: { paceFuzz: true },
-
-  teamPepTalk: {
-    extraEffects: (state, race, you) => ({ determination: 10 * currentLap(you) }),
-  },
 
   keepUpWithThatGuy: {
     isActive: (state, race, you) => passesMadeSince(race, you, state.pickedAt) < 2,

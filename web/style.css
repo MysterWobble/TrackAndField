@@ -1,0 +1,299 @@
+/* The game's colors and font (SPEC section 9). */
+:root {
+  --track-red: #c8553d;
+  --infield-green: #5fa04e;
+  --sky-blue: #8ec9f0;
+  --lane-white: #f7f4ea;
+  --you-green: #2ee66b;
+  --gold: #f2b33d;
+  --navy: #1f2a44;
+  --gap: max(12px, env(safe-area-inset-left));
+  font-family: "Baloo 2", system-ui, sans-serif;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--sky-blue);
+  color: var(--navy);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+#scene {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ---------- Race display ---------- */
+
+#hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none; /* taps go through to the game, except on buttons */
+}
+
+.panel {
+  position: absolute;
+  padding: 6px 14px;
+  border-radius: 14px;
+  background: rgba(247, 244, 234, 0.9);
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: pre-line;
+}
+
+.hud-info {
+  top: var(--gap);
+  left: var(--gap);
+  font-size: 14px;
+  max-width: 34vw;
+}
+
+.hud-lap {
+  top: var(--gap);
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.hud-position {
+  top: var(--gap);
+  right: var(--gap);
+  text-align: right;
+  font-size: 15px;
+}
+.hud-position::first-line {
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.hud-bottom {
+  bottom: var(--gap);
+  left: var(--gap);
+  width: min(300px, 40vw);
+  font-size: 14px;
+}
+
+.stamina-bar {
+  height: 16px;
+  margin: 4px 0 6px;
+  border-radius: 8px;
+  background: rgba(31, 42, 68, 0.2);
+  overflow: hidden;
+}
+.stamina-fill {
+  height: 100%;
+  background: var(--you-green);
+  transition: width 0.15s linear;
+}
+.stamina-fill.low {
+  background: var(--track-red);
+}
+.stamina-fill.hidden-stat {
+  background: repeating-linear-gradient(45deg, #b9b3a3 0 8px, #d9d4c3 8px 16px);
+}
+
+.splits {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* The kick button: big, round, under your right thumb. */
+.kick-button {
+  position: absolute;
+  right: calc(var(--gap) + 8px);
+  bottom: calc(var(--gap) + 8px);
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  border: 5px solid var(--navy);
+  background: var(--you-green);
+  color: var(--navy);
+  font: 800 17px/1.1 "Baloo 2", system-ui, sans-serif;
+  white-space: pre-line;
+  pointer-events: auto;
+  touch-action: none;
+  box-shadow: 0 6px 0 var(--navy);
+}
+.kick-button.on {
+  background: var(--gold);
+  transform: translateY(4px) scale(1.06);
+  box-shadow: 0 2px 0 var(--navy), 0 0 30px 10px rgba(242, 179, 61, 0.8);
+  animation: throb 0.2s ease-in-out infinite alternate;
+}
+.kick-button.tired {
+  background: #b9b3a3;
+}
+@keyframes throb {
+  to {
+    box-shadow: 0 2px 0 var(--navy), 0 0 45px 18px rgba(242, 179, 61, 0.9);
+  }
+}
+
+/* Nitro glow around the screen edges while you kick, with streaking speed lines. */
+.kick-glow {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+  background:
+    radial-gradient(ellipse at center, transparent 55%, rgba(242, 179, 61, 0.55) 100%),
+    repeating-linear-gradient(90deg, transparent 0 60px, rgba(255, 255, 255, 0.18) 60px 64px);
+  background-size: 100% 100%, 200% 100%;
+  /* Only around the edges, so the race in the middle stays clear. */
+  -webkit-mask-image: radial-gradient(ellipse at center, transparent 45%, black 85%);
+  mask-image: radial-gradient(ellipse at center, transparent 45%, black 85%);
+}
+.kick-glow.on {
+  opacity: 1;
+  animation: streak 0.35s linear infinite;
+}
+@keyframes streak {
+  from {
+    background-position: 0 0, 0 0;
+  }
+  to {
+    background-position: 0 0, -128px 0;
+  }
+}
+
+/* Pop-up messages */
+.messages {
+  position: absolute;
+  top: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.toast {
+  padding: 4px 14px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 16px;
+  background: rgba(247, 244, 234, 0.95);
+  transition: opacity 0.6s;
+}
+.toast.good {
+  border: 3px solid var(--you-green);
+}
+.toast.bad {
+  border: 3px solid var(--track-red);
+}
+.toast.info {
+  border: 3px solid var(--gold);
+}
+.toast.fade {
+  opacity: 0;
+}
+
+/* ---------- Card picks and results (plain for now; step 6 makes them pretty) ---------- */
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 16px;
+  background: rgba(31, 42, 68, 0.55);
+  pointer-events: auto;
+}
+.overlay.hidden {
+  display: none;
+}
+.overlay h2 {
+  margin: 0;
+  padding: 4px 18px;
+  border-radius: 12px;
+  background: var(--lane-white);
+  font-size: 24px;
+}
+
+.cards {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.card {
+  width: min(230px, 28vw);
+  min-height: 180px;
+  padding: 12px;
+  border: 4px solid var(--navy);
+  border-radius: 16px;
+  background: var(--lane-white);
+  color: var(--navy);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.card:hover {
+  transform: translateY(-4px);
+  border-color: var(--you-green);
+}
+.card-key {
+  align-self: flex-end;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--navy);
+  color: var(--lane-white);
+  text-align: center;
+  font-weight: 800;
+}
+.card-type {
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--track-red);
+}
+.card-name {
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+.card-text {
+  font-size: 14px;
+  line-height: 1.25;
+}
+.type-unique .card-type {
+  color: #9b5de5;
+}
+
+.results {
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: var(--lane-white);
+  font: 600 15px/1.5 ui-monospace, Consolas, monospace;
+  white-space: pre;
+}
+.result.you {
+  color: #178a3f;
+  font-weight: 800;
+}
+.again {
+  padding: 8px 22px;
+  border: 4px solid var(--navy);
+  border-radius: 14px;
+  background: var(--you-green);
+  font: 800 18px "Baloo 2", system-ui, sans-serif;
+  cursor: pointer;
+}
