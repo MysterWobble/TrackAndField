@@ -106,12 +106,12 @@ Fixes the PB plateau: training permanently raises your baseline.
 ## 9\. Look and Feel
 
 - **Style:** low-poly 3D stadium, fixed angled camera over the track  
-- **Palette (5–6 hex colors):**  
-- **Typeface:**  
-- **Mood in three words:**  
+- **Palette (5–6 hex colors):** track red #C8553D · infield green #5FA04E · sky blue #8EC9F0 · lane white #F7F4EA · you green #2EE66B (your runner: the "this is me" color) · gold #F2B33D (highlights, kicking, personal bests) · navy #1F2A44 (text). *Cozy vibe planned for the real assets; reference images coming.*  
+- **Typeface:** Baloo 2 (Google Fonts, rounded and bold)  
+- **Mood in three words:** bright, energetic, friendly (a sunny school meet)  
 - **Reference images:** *attach 2–3*  
 - **Do NOT want:**  
-- **Theme:** straight track for v1. Zombie version maybe later (same mechanics, new models and card names).
+- **Theme:** a normal 400 m oval track for v1. Zombie version maybe later (same mechanics, new models and card names).
 
 ## 10\. Screens for Version 1
 

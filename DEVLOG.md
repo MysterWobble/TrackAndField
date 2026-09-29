@@ -111,6 +111,25 @@ Short entries, every session. This becomes the portfolio and essay material.
 - **`npm.cmd run career`:** shows your runners, personal bests and recent races, and lets you spend banked points.
 **Next:** Play a few career races and see how fast personal bests come.
 
+## 2026-09-26 (late): PLAN step 5 started, 3D race view
+**Decisions made (and why):**
+- **Look and feel (SPEC section 9 filled in):** a sunny school meet. Palette: track red #C8553D, infield green #5FA04E, sky blue #8EC9F0, lane white #F7F4EA, gold #F2B33D (your runner), navy #1F2A44. Font: Baloo 2. Mood: bright, energetic, friendly. "Straight track" meant a normal 400 m oval.
+- **Phone held sideways (landscape).** The whole game moves to the browser in this step with plain menus; step 6 makes them pretty.
+- **Tools:** Three.js (3D) and Vite (runs it in the browser), both free and open source.
+- **Part 1 built:** a 400 m track with real proportions (two 84.39 m straights and two bends), built from code with no downloads: lane lines, finish line, stands with a blocky crowd, trees. Placeholder runners (drawn 3.5x life size so you can see them) move exactly where the race sim says, and spread across lanes when bunched. The camera fits the whole track on any screen. **Hold-to-kick finally works** (Space, K, or holding the screen), since a browser can tell when you let go.
+- Same race sim as the terminal version, so balance changes apply to both.
+**Polish list for step 6:** finished runners jog past the line instead of stopping on it.
+
+**Playtest feedback on part 1 (designers):** runner size, camera angle and race speed are good. Changes:
+- **Your runner is green** (#2EE66B, the universal "this is me" color), not gold. Green was removed from the computer runners' colors. SPEC section 9 updated.
+- **Kick needs nitro-style feedback:** now there's a gold glow and streaking speed lines around the screen edges, your runner glows, sparks trail behind it, and the kick button lights up.
+- **The pack didn't look realistic** (fanned out wide like racing horses). Now runners hug the inside lane in a line, step out to lane 2-3 only to pass, change lanes gradually, and are never more than 3 wide. Bounce reduced.
+- **Card choices were missing:** moved up from part 3. The race now pauses for a card pick before the start and after laps 1-3.
+- **Mood:** fine for now, but the real assets should feel **cozy**. Reference images coming.
+**Part 2 built:** the race display (lap, time, position with gaps, stamina bar, pace, splits, cards held), pop-up messages (passes, boxed in, Determination), a big hold-to-kick button for phones, and a results screen. Finished runners jog past the line. Checked at phone size held sideways.
+**Card fix (designers):** "Team Pep-Talk" was building up (+10, +20, +30, +40 Determination). It should be +10 on every lap without building up, so it's now a flat +10 Determination.
+**Next:** part 3, menus for conditions, runner choice and training, plus saving in the browser.
+
 ---
 
 ## Milestones
