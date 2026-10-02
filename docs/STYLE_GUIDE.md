@@ -151,12 +151,19 @@ scene.fog = new THREE.Fog(COLORS.haze, NEAR, FAR);              // light: only t
 | Stands | code: stepped boxes, oak seats, green roof | merged per material |
 | Crowd | `InstancedMesh`: capsule body + ball head, 4–5 muted palette colors | 1–2 draw calls |
 | Trees | `IcosahedronGeometry(r, 0)` × 3–6 lumps + cylinder trunk, merged then instanced | ~100 tris each |
-| Runners | Quaternius GLB | ≤ 3k tris |
+| Runners | code (v0.4): late-90s RPG-style segmented characters, `web/runnerModel.js` | ~880–960 tris, 13–14 draw calls each |
 | Props | Kenney GLB or code | small, grouped into zones |
 
 - **Whole scene:** aim for fewer than ~100 draw calls and ~150k triangles. These are rough targets, so check `renderer.info` on a real phone.
 - **Edges:** terrain, track and rocks have sharp facets. Built objects (stands, hurdles, signs) can have a single bevel or rounded corner.
 - **Proportions:** slightly chunky and toylike. Where models allow, favor thick limbs and big heads over realism.
+- **Runners (v0.4, designers' decision): inspired by late-90s 3D RPG characters such as Final Fantasy VII.** Borrow the style only; never copy its characters, hairstyles, outfits or assets.
+  - Rigid body segments joined at the joints, flat colors with no textures, five-sided faceted limbs.
+  - A big, faceted round head with an angular jaw, a small nose, ears and dark block eyes; big hands; big spiked shoulder caps and pointed elbows; rounded sneakers; and angular hair (spiky, ponytail, buzz, bun, crop, sweatband).
+  - Singlet with a race bib, and shorts.
+  - Built in code, then each segment is baked into one vertex-colored mesh.
+  - Kits set the shirt and shorts. Skin, hair and shoes vary per runner (`RUNNER_LOOKS` in `web/colors.js`).
+  - Close-up viewer for tweaking: `/dev/runners.html` on the dev server.
 
 ## 7. Imported assets
 
@@ -169,7 +176,7 @@ gltf.scene.traverse((o) => {
 });
 ```
 
-- **Quaternius:** map each named material (skin, hair, shirt, shorts, shoes) to the palette. Kits change only the shirt and shorts colors.
+- **Quaternius** (if we ever import characters): map each named material (skin, hair, shirt, shorts, shoes) to the palette. Kits change only the shirt and shorts colors.
 - **Kenney:** many kits color their models from a shared `colormap.png`. Replacing the material with one solid color would flatten every part into that color. For those kits, recolor the PNG once to match our palette. Only use the override above on kits that have a separate material per part.
 - Normalize scale when loading. All runners use one shared scale constant.
 - Don't mix palettes. Every imported asset gets remapped before it ships.
@@ -190,7 +197,7 @@ gltf.scene.traverse((o) => {
 
 ## 9. Motion
 
-- **Tie the run cycle to ground speed** (`action.timeScale = speed / clipSpeed`) so feet don't slide.
+- **Tie the run cycle to each runner's effort.** The race plays about 7× faster than real life, so true foot speed would just be a blur. Instead, the stride rate follows each runner's pace compared to their normal pace (about 2.3–3.6 strides a second), and kicking lengthens the stride and pumps the arms harder.
 - Everything eases: camera moves, UI panels, finish-line moments. Nothing snaps.
 - Background life is small and slow. The crowd bobs a few centimeters each, out of sync with each other; trees may sway slightly. Keep it cheap by doing it in the vertex shader or updating the instances a few times a second.
 - The baseline pace is calm, like a toy train. No screen shake.

@@ -250,7 +250,43 @@ Short entries, every session. This becomes the portfolio and essay material.
 - **Every card's Speed is about 5% weaker:** +20 → +19, +10 → +9.5, +30 → +28.5. For +15 the exact 5% would be +14.25, so it became +14.5 to keep the card text tidy. Top Speed cards are unchanged.
 - **Determination refill: 5 + 0.4 per point** (was 0.3): 35 Determination → +19 stamina (was +15.5; before the first playtest it was +26). Still one roll per lap.
 
-**Simulated (150 races):** about the same as before. A player picking cards at random wins about 10% (average 4th). Computer runners use the same cards, so the Speed nerf hits them too. Stacked Determination builds that kick all race win 1–4%, so the buff doesn't bring back the old exploit.
+**Simulated (150 races):** about the same as before.
+
+## 2026-10-02 (evening): Real runners, late-90s RPG style (step 5, part 4b)
+**Designer decision:** runner models inspired by Final Fantasy VII-era low-poly characters, instead of the planned Quaternius downloads. We borrow the style only, never FF7's characters or assets.
+
+**Built** (`web/runnerModel.js`):
+- **Construction:** runners made of rigid segments (hips, torso, head, upper arms, forearms, thighs, shins, shoes) joined at the joints, in flat colors with five-sided faceted limbs.
+- **Look:** a big head with a pointed chin and dark block eyes, big hands, chunky shoes with dark soles, a singlet with a race bib, and shorts. Five hair styles (spiky, ponytail, buzz, bun, crop).
+- **Variety:** kits set the shirt and shorts; skin, hair and shoe colors vary per runner (`RUNNER_LOOKS` in `web/colors.js`). Your runner keeps the You-green kit.
+- **The stride:**
+  - legs swing and knees fold through the swing;
+  - arms pump against the legs, with the shoulders twisting against the hips;
+  - the body leans forward and bobs twice per stride, and ponytails swing.
+  - Kicking (or surging) lengthens the stride, pumps the arms harder and leans in more.
+  - Finished runners jog to a stop.
+- **Performance:** each runner is built from small pieces, then each segment is baked into one vertex-colored mesh. That's 13–14 draw calls and about 400–470 triangles per runner (budget: 3,000). The kick glow still lights up only you (your runner has its own copy of the material).
+- **A close-up viewer** at `/dev/runners.html` on the dev server shows all eight runners running in place (keys 0–3 change the pace; drag to turn).
+
+**Decisions made (and why):**
+- **The stride rate follows effort, not true foot speed.** The race plays about 7× faster than real life, so feet matching the ground would be a blur. A readable stride matters more from the stadium camera.
+- **The style guide** now records the runner style and the "inspired by, never copied" rule.
+
+**Designer tweaks, same day:**
+- **Heads more head-shaped:** a faceted round skull with an angular jaw, a nose and ears (was a wedge). Hair now hugs the skull as a cap, with each style's spikes, tail or bun on top.
+- **Bigger, spikier shoulders:** a wider chest, and big angular shoulder caps with two spikes each (out-and-up, and a smaller out-and-back).
+- **Shoe-shaped shoes:** a wedge with a taller heel sloping down to a lower, narrower toe, an ankle collar, and a dark sole.
+- Now about 650–710 triangles per runner, still 13–14 draw calls. The viewer can zoom (scroll).
+
+**Second round of tweaks:**
+- Pointed elbows (a small spike out the back of each arm).
+- Shoes less blocky: a firm heel, a rounded toe box and an oval sole.
+- A smaller nose.
+- A sixth hair style, **sweatband**: a band round the forehead (bib-white) with a tuft standing straight up.
+- Fixed: the old style picker would have used only 3 of 6 styles; the new `hairStyleFor` spreads all 6 across the field.
+- About 880–960 triangles per runner (the rounded shoes), still 13–14 draw calls; budget is 3,000.
+
+**Next:** the designers check the runners in a race (they're small from the race camera, so overall shape and motion matter most). Then: rarity colors and sounds (step 6), or deploy (step 8). A player picking cards at random wins about 10% (average 4th). Computer runners use the same cards, so the Speed nerf hits them too. Stacked Determination builds that kick all race win 1–4%, so the buff doesn't bring back the old exploit.
 
 ---
 

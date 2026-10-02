@@ -78,3 +78,12 @@ export const CROWD = {
   shirts: [0xefe6d2, 0x2f4a7a, 0x6fa8d6, 0x7a4e7e, 0xb8913f, 0xe39fae],
   skin: [0xeac7a3, 0xcf9f72, 0x9a6a45, 0x6e4a32],
 };
+
+// Runners' own looks (web/runnerModel.js). Kits set the shirt and shorts; these vary everything else.
+// No gold (it means kicking) and no green (it means you).
+export const RUNNER_LOOKS = {
+  skin: [0xeac7a3, 0xcf9f72, 0x9a6a45, 0x6e4a32, 0xdcb08a],
+  hair: [0x2b2220, 0x4a3424, 0x7d4a2c, 0xa98258, 0x1c1c22],
+  shoes: [0xefe6d2, 0x3b3a3f, 0xc8544a, 0x6fa8d6],
+  bib: 0xf6f0e2,
+};

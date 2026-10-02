@@ -11,7 +11,8 @@ Every outside asset, font, and tool used in the game, with its license. Add a li
 - _None yet._ The stadium, campus, crowd, trees, and placeholder runners are built in code.
 - **Lettering** ("TIGERS", the big T): original block letters made from simple shapes in `web/lettering.js`. No font files.
 - **Campus layout:** laid out by eye from the designers' Google Maps screenshots of the real school. The screenshots are a reference only; no map imagery is in the game or the repo.
-- **Coming:** Quaternius low-poly runners (CC0) and possibly Kenney kits (CC0). Log each pack here with its name and link.
+- **Runners:** original low-poly characters built in code (`web/runnerModel.js`), in a style inspired by late-90s 3D RPGs. No models or textures from any game.
+- **Maybe later:** Kenney kits (CC0). Log each pack here with its name and link.
 
 ## Fonts
 - **Baloo 2** by Ek Type, from Google Fonts. SIL Open Font License 1.1.
