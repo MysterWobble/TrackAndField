@@ -141,6 +141,43 @@ Short entries, every session. This becomes the portfolio and essay material.
 - **Testing tip:** add `?speed=10` to the address to run races 10x faster.
 **Next:** part 4, real runner models (with the cozy look, once reference images arrive).
 
+## 2026-10-01: Art style guide, and the cozy look (step 5, part 4a)
+**Decisions made (and why):**
+- **Art style guide v0.2** (`docs/STYLE_GUIDE.md`), written by the designers with Whistlevale as the feel reference: "a warm, hand-built tabletop model of a track meet on a late afternoon." It's now the single source of truth for the look; SPEC section 9 points to it. Decided: a diorama base (yes), a terracotta track, evening mode later, tilt-shift blur only after the phone test.
+- Added `docs/style-refs/` for reference screenshots and `CREDITS.md` for every outside asset, font, and library.
+**Built (all in code, no downloads):**
+- The guide's warm palette (`web/colors.js`), with one shared matte material per color (`web/materials.js`). Your runner's material is its own copy, so only you glow when kicking.
+- Warm side lighting (one sun about 45° up, a warm sky light), neutral tone mapping, warm haze, and a CSS backdrop behind a transparent canvas.
+- **A floating diorama slab:** sandy top, 4 terraced earth bands, an oak rim. It reaches further on the far side than the near side. The camera now measures the slab's outline and backs off until all of it fits on any screen.
+- **The main stand moved to the far side, facing the camera:** from the near side you only saw its roof. Cream steps, oak benches, a brass rail, a green roof on posts, and a crowd of capsules with ball heads that bob gently out of sync (2 draw calls).
+- Chunky trees (canopy lumps on trunks) in calm zones, pines along the back edge.
+- Runners in the guide's kit colors with darker shorts, warm blob shadows nudged away from the sun, and a You-green ring under your runner.
+- **Kick restyle:** your runner's gold glow, a few warm glowing motes instead of box sparks, a soft gold edge vignette, faint cream speed lines.
+- **UI:** dark green panels with cream text, cream cards with ink text, gold pill buttons, the guide's type sizes, touch targets of at least 44px. On short (phone) screens the menus tighten so 3 cards fit without scrolling. At most 2 pop-up messages show at once, with no repeats within 3 seconds.
+**Still to check:** draw calls and frame rate on a real phone (rough count: about 80 draw calls, under the guide's 100). Static scenery could be merged further if needed.
+**Next:** the Quaternius runner models (part 4b), then the phone test.
+
+## 2026-10-01 (later): The real high school, from the air
+**Designer asks:** a more colorful, detailed track; UI that matches its colors (with a new `docs/UI_DIRECTION.md` inspired by Yoshi's Crafted World); and the track set in the stepson's actual high school instead of floating in space, seen from the sky.
+**Decisions made (and why):**
+- **Match the real school**, from aerial photos: red track, green turf, navy end zones, white field border, gray walkway. These replace the terracotta track (style guide v0.3). Navy and green track options were previewed first: a green track hid your green runner, and a navy one hid the navy and charcoal kits.
+- **No floating slab.** The campus runs past the screen edges into hazy chaparral hills, like a view from the sky. (Style guide §8 updated.)
+- **No school name, mascot, or logo for now**, because the repo and game are public and it would tie the game to where a student goes to school. The end zones, press box and scoreboard stay plain until the designers decide.
+**Built (all low-poly, in code):** the stadium (lane lines, exchange-zone marks, the 1600 m start arc, the football field with stripes, yard lines and numbers, navy end zones and team areas, goal posts, long jump runways and sand pits, a shot put circle), home bleachers with the press box (north), visitor bleachers (south), light poles, a scoreboard (east). The campus in `web/campus.js`: portables, the main buildings with roof units, the pool, 8 tennis courts, parking lots with cars, the road down the east side, baseball and softball diamonds, palms, scrub, and hills. The camera frames the whole stadium plus the front of the school.
+**Trade-off noticed:** showing the campus makes the runners a bit smaller than before. Still readable at phone size; check on a real phone in part 5.
+**Next:** the UI direction (layered paper panels, outlined numbers, run-path strip, select-then-Continue cards, Big Moment results, springy motion) in the school's colors, then the runner models.
+
+## 2026-10-01 (evening): Tigers, the big T, and the real campus layout
+**Designer asks:** show a team name and the big T (leave the school's own name out); put the big T on the hill like the real one; make the campus closer to the real school. The designers sent Google Maps screenshots (top-down and tilted).
+**Decisions made (and why):**
+- **"TIGERS" everywhere the real school shows its name**: both end zones, the press box ("TIGERS FOOTBALL"), the scoreboard, and the building facing the stadium. The big T at midfield and on the hill. We first used the real team name, then switched to a made-up one that starts with T, so the big T still fits. Neither the school's name nor its real team name appears anywhere. Tigers is one of the most common team names, so it doesn't point to any one school.
+- **Lettering is drawn from shapes** (`web/lettering.js`), not a font: chunky, low-poly, and original, with no font license to track.
+- **Two camera views.** The hill T is northwest of the stadium, outside the race view. Zooming the race camera out would shrink the runners, so the menus get a wider view (campus and hill T) and the camera glides in when the race starts. The race view is now slightly closer than before, so the runners are a little bigger.
+- **Campus laid out from the screenshots** (style guide §8 lists what's where). The hill T is about four times its real size so it reads from the air.
+- **The 10° turn:** the real stadium sits about 10° off east-west. The buildings line up with the track; the hills, roads and ball fields are turned to match.
+- **Stands match the photos:** the home side is 64 m long, just east of center; the visitor side is 50 m long, west of center, with its own little press box. Long jump runways were added in the east curve, and the west curve is paved red for the high jump. These replace the shot put circle, which isn't in the photos.
+**Next:** the designers check the new layout, then the UI direction.
+
 ---
 
 ## Milestones

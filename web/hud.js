@@ -77,9 +77,13 @@ export function createHud(root) {
   }
 
   // A message that pops up for a few seconds. tone: "good", "bad", or "info".
+  const lastShown = new Map(); // message text -> when it was last shown
   function toast(text, tone = "info") {
+    const now = performance.now();
+    if (now - (lastShown.get(text) ?? -Infinity) < 3000) return; // don't repeat the same message within 3 seconds
+    lastShown.set(text, now);
     const note = element("div", `toast ${tone}`, messages, text);
-    while (messages.children.length > 4) messages.firstChild.remove();
+    while (messages.children.length > 2) messages.firstChild.remove(); // at most 2 at once, so the race stays visible
     setTimeout(() => note.classList.add("fade"), 2500);
     setTimeout(() => note.remove(), 3200);
   }
@@ -100,7 +104,10 @@ export function messageFor(event, race) {
   const name = (entrant) => (entrant === race.rival ? `your rival ${entrant.runner.name}` : entrant.runner.name);
   const place = () => ordinal(race.positionOf(you));
   if (event.type === "pass" && mine) return [`You pass ${name(event.passed)}! Now ${place()}.`, "good"];
-  if (event.type === "pass" && event.passed === you) return [`${name(event.entrant)} passes you. Now ${place()}.`, "bad"];
+  if (event.type === "pass" && event.passed === you) {
+    const who = name(event.entrant);
+    return [`${who[0].toUpperCase()}${who.slice(1)} passes you. Now ${place()}.`, "bad"]; // "Your rival..." starts the sentence
+  }
   if (event.type === "boxed" && mine) return ["Boxed in! Stuck behind the runner ahead.", "bad"];
   if (event.type === "determination" && mine) return [`Determination! +${event.bonus.toFixed(0)} stamina`, "good"];
   if (event.type === "ranOut" && mine) return ["Out of stamina! Fading...", "bad"];

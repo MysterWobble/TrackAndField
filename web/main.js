@@ -29,8 +29,9 @@ import {
 import { CONDITIONS, CONDITION_KEYS } from "../data/conditions.js";
 import { STYLES } from "../data/styles.js";
 import { tuning } from "../data/tuning.js";
-import { COLORS, SHADES } from "./colors.js";
-import { buildStadium } from "./stadium.js";
+import { COLORS } from "./colors.js";
+import { buildStadium, stadiumFitPoints } from "./stadium.js";
+import { buildCampus, hillTFitPoints } from "./campus.js";
 import { createRunnerViews } from "./runners.js";
 import { createKickTrail } from "./effects.js";
 import { createHud, messageFor } from "./hud.js";
@@ -41,38 +42,97 @@ const speedUp = Number(new URLSearchParams(location.search).get("speed")) || 1;
 
 // --- The 3D world ---
 
+// Lighting and atmosphere follow docs/STYLE_GUIDE.md §5.
 const canvas = document.getElementById("scene");
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true }); // transparent, so the CSS backdrop shows
+renderer.setClearColor(0x000000, 0);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.NeutralToneMapping; // keeps palette hues honest
+renderer.shadowMap.enabled = false; // blob shadows only
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // sharp on phones, but not so sharp it gets slow
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(COLORS.skyBlue);
-scene.fog = new THREE.Fog(COLORS.skyBlue, 260, 520);
-scene.add(new THREE.HemisphereLight(0xffffff, SHADES.outerGrass, 1.8));
-const sun = new THREE.DirectionalLight(0xffffff, 1.6);
-sun.position.set(40, 100, 60);
+const scene = new THREE.Scene(); // no scene.background: it would cover the CSS backdrop
+scene.fog = new THREE.Fog(COLORS.haze, 280, 650); // the campus and hills fade into warm haze in the distance
+scene.add(new THREE.HemisphereLight(0xf3e7cc, 0x8a7a55, 1.5)); // warm sky, olive bounce
+const sun = new THREE.DirectionalLight(COLORS.sun, 2.0);
+sun.position.set(-1, 1.1, 0.6).multiplyScalar(50); // ~45° up, from the side
 scene.add(sun);
-scene.add(buildStadium(createRandom(1).next)); // the same crowd and trees every time
+const stadium = buildStadium(createRandom(1).next); // the same crowd every time
+scene.add(stadium.group);
+scene.add(buildCampus(createRandom(2).next)); // the school around the stadium, the same every time
 
-// A fixed camera above the main stands, looking down across the whole track (SPEC section 9).
-const camera = new THREE.PerspectiveCamera(35, 1, 1, 1000);
-const LOOK_AT = new THREE.Vector3(0, 0, 4);
-const FROM_TARGET_TO_CAMERA = new THREE.Vector3(0, 0.62, 0.78).normalize(); // up and toward the viewer
-const HALF_WIDTH = 98; // meters of track (plus a little stands) that must fit side to side...
-const HALF_DEPTH = 58; // ...and front to back
+// Two fixed, steep camera views from over the south side:
+//   race - the whole stadium just fits, so the runners stay as big as possible.
+//   wide - for the menus: pulled back so you can see the campus and the big T on the hill.
+// The camera glides between them when a race starts or ends.
+const camera = new THREE.PerspectiveCamera(38, 1, 1, 1000);
+const FROM_TARGET_TO_CAMERA = new THREE.Vector3(0, 0.6, 0.8).normalize(); // up and toward the viewer, about 37° down
+const STADIUM_POINTS = stadiumFitPoints();
+const HILL_T_POINTS = hillTFitPoints();
+const VIEWS = {
+  race: { lookAt: new THREE.Vector3(0, 0, -4), points: STADIUM_POINTS },
+  wide: { lookAt: new THREE.Vector3(-40, 0, -20), points: [...STADIUM_POINTS, ...HILL_T_POINTS] }, // nudged toward the hill T
+};
+for (const view of Object.values(VIEWS)) {
+  view.points = view.points.map(([x, y, z]) => new THREE.Vector3(x, y, z));
+  view.position = new THREE.Vector3();
+}
+const FIT_MARGIN = 0.97; // keep everything just inside the screen edge
+const GLIDE_SECONDS = 1.6;
+let viewBlend = 1; // 0 = race view, 1 = wide view
+let wideWanted = true;
+
+function placeCamera(position, lookAt) {
+  camera.position.copy(position);
+  camera.lookAt(lookAt);
+  camera.updateMatrixWorld();
+}
+
+// Back the camera off until every point of a view fits on screen, whatever shape the screen is.
+// (Perspective makes the near edge look wider, so we check real points instead of guessing.)
+function fitView(view) {
+  const placeAt = (distance) => placeCamera(view.position.copy(view.lookAt).addScaledVector(FROM_TARGET_TO_CAMERA, distance), view.lookAt);
+  const fits = () =>
+    view.points.every((point) => {
+      const p = point.clone().project(camera);
+      return Math.abs(p.x) <= FIT_MARGIN && Math.abs(p.y) <= FIT_MARGIN && p.z < 1;
+    });
+  let near = 40;
+  let far = 900;
+  for (let i = 0; i < 24; i++) {
+    const middle = (near + far) / 2;
+    placeAt(middle);
+    if (fits()) far = middle;
+    else near = middle;
+  }
+  placeAt(far);
+}
 
 function fitCamera() {
   const width = window.innerWidth;
   const height = window.innerHeight;
   renderer.setSize(width, height, false);
   camera.aspect = width / height;
-  // Back the camera off until the whole track fits, whatever shape the screen is.
-  const verticalView = THREE.MathUtils.degToRad(camera.fov);
-  const horizontalView = 2 * Math.atan(Math.tan(verticalView / 2) * camera.aspect);
-  const distance = Math.max(HALF_WIDTH / Math.tan(horizontalView / 2), HALF_DEPTH / Math.tan(verticalView / 2));
-  camera.position.copy(LOOK_AT).addScaledVector(FROM_TARGET_TO_CAMERA, distance);
-  camera.lookAt(LOOK_AT);
   camera.updateProjectionMatrix();
+  fitView(VIEWS.race);
+  fitView(VIEWS.wide);
+  moveCamera(0);
+}
+
+// Glide toward the wanted view (smooth start and stop).
+const lookAt = new THREE.Vector3();
+const position = new THREE.Vector3();
+function moveCamera(dt) {
+  const step = dt / GLIDE_SECONDS;
+  viewBlend = wideWanted ? Math.min(1, viewBlend + step) : Math.max(0, viewBlend - step);
+  const t = viewBlend * viewBlend * (3 - 2 * viewBlend);
+  placeCamera(position.lerpVectors(VIEWS.race.position, VIEWS.wide.position, t), lookAt.lerpVectors(VIEWS.race.lookAt, VIEWS.wide.lookAt, t));
+}
+
+// Menus get the wide view; races get the race view.
+function showRace(on) {
+  hud.setVisible(on);
+  wideWanted = !on;
 }
 window.addEventListener("resize", fitCamera);
 fitCamera();
@@ -118,7 +178,7 @@ function runnerChoice(index) {
 // --- Screens ---
 
 async function home() {
-  hud.setVisible(false);
+  showRace(false);
   const lines = [];
   if (welcome) {
     lines.push({ text: "Welcome! Here's your career. You have 3 runners, and they get better as you train.", tone: "good" });
@@ -196,7 +256,7 @@ async function startRace({ seed, rng, runner, runnerIndex, condition, conditionK
   lapsOffered = 0;
   logShown = 0;
   tickBank = 0;
-  hud.setVisible(true);
+  showRace(true);
 
   state = "picking";
   await pickCard(0);
@@ -260,7 +320,7 @@ async function afterRace() {
 // --- Training ---
 
 async function train() {
-  hud.setVisible(false);
+  showRace(false);
   if (career.trainingPoints < 1) return home();
 
   const pick = await screens.show({
@@ -324,7 +384,8 @@ window.addEventListener("blur", () => setKick(false)); // switching apps shouldn
 
 let lastFrame = performance.now();
 function frame(now) {
-  const dt = Math.min(0.1, (now - lastFrame) / 1000); // real seconds since the last frame (capped if the tab was hidden)
+  const realDt = (now - lastFrame) / 1000;
+  const dt = Math.min(0.1, realDt); // real seconds since the last frame (capped if the tab was hidden)
   lastFrame = now;
 
   if (race && state === "running") {
@@ -361,6 +422,8 @@ function frame(now) {
     trail.update(dt, runnerViews.you.group, race.player.kicking);
     hud.update(race);
   }
+  stadium.update(now / 1000); // the crowd bobs
+  moveCamera(realDt); // not capped: the glide takes the same time even if frames are slow
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }

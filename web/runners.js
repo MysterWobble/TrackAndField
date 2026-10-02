@@ -9,7 +9,8 @@
 //   - never more than 3 wide: extra runners tuck in behind instead
 
 import * as THREE from "three";
-import { COLORS, SHADES } from "./colors.js";
+import { COLORS } from "./colors.js";
+import { mat } from "./materials.js";
 import { LANE_WIDTH, pointOnTrack } from "./track.js";
 
 export const RUNNER_SCALE = 3.5; // drawn bigger than life so you can see them from the stadium camera
@@ -20,28 +21,43 @@ const CATCH_UP_SPEED = 3; // meters per second a tucked-in runner's shown positi
 const JOG_PAST_FINISH = 25; // meters finished runners jog on past the line
 const BOB = 0.05; // how much runners bounce as they run
 
+// Blob shadows fall away from the sun, which shines from the left and slightly toward the camera.
+const SHADOW_NUDGE = { x: 0.12 * RUNNER_SCALE, z: -0.07 * RUNNER_SCALE };
+const SHADOW_MATERIAL = new THREE.MeshBasicMaterial({ color: COLORS.shadow, transparent: true, opacity: 0.35, depthWrite: false });
+
+// Shorts are a step darker than the shirt, or charcoal/cream for the cream/charcoal kits (STYLE_GUIDE.md §3).
+function shortsColor(shirt) {
+  if (shirt === COLORS.kits[0]) return COLORS.kits[5];
+  if (shirt === COLORS.kits[5]) return COLORS.kits[0];
+  return new THREE.Color(shirt).multiplyScalar(0.72).getHex();
+}
+
 function makeRunnerModel(color, isYou) {
   const group = new THREE.Group();
-  const material = new THREE.MeshLambertMaterial({ color, flatShading: true });
+  // Your runner's material is your own copy, so the kick glow lights up only you (STYLE_GUIDE.md §4).
+  const material = isYou ? mat(color).clone() : mat(color);
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.25, 0.7, 2, 6), material);
   body.position.y = 0.85;
+  const shorts = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.3, 6), mat(shortsColor(color)));
+  shorts.position.y = 0.62;
   const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.2, 0), material);
   head.position.y = 1.55;
-  group.add(body, head);
+  group.add(body, shorts, head);
 
-  const shadow = new THREE.Mesh(
-    new THREE.CircleGeometry(0.4, 12),
-    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25 }),
-  );
-  shadow.rotation.x = -Math.PI / 2;
-
+  const shadow = new THREE.Group();
+  const blob = new THREE.Mesh(new THREE.CircleGeometry(0.42, 12), SHADOW_MATERIAL);
+  shadow.add(blob);
   let marker = null;
   if (isYou) {
-    marker = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.6, 4), new THREE.MeshLambertMaterial({ color: COLORS.you }));
+    // Your runner gets a You-green ring around its shadow, plus a marker overhead.
+    const ringMaterial = new THREE.MeshBasicMaterial({ color: COLORS.you, depthWrite: false });
+    shadow.add(new THREE.Mesh(new THREE.RingGeometry(0.5, 0.62, 20), ringMaterial));
+    marker = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.6, 4), mat(COLORS.you));
     marker.rotation.x = Math.PI; // point down at your runner
     marker.position.y = 2.4;
     group.add(marker);
   }
+  shadow.rotation.x = -Math.PI / 2;
   group.scale.setScalar(RUNNER_SCALE);
   shadow.scale.setScalar(RUNNER_SCALE);
   return { group, shadow, marker, material };
@@ -49,7 +65,7 @@ function makeRunnerModel(color, isYou) {
 
 export function createRunnerViews(race, scene) {
   const views = race.entrants.map((entrant, i) => {
-    const color = entrant.isPlayer ? COLORS.you : SHADES.runners[(i - 1) % SHADES.runners.length];
+    const color = entrant.isPlayer ? COLORS.you : COLORS.kits[(i - 1) % COLORS.kits.length];
     const model = makeRunnerModel(color, entrant.isPlayer);
     scene.add(model.group, model.shadow);
     // Everyone starts spread across the lanes (like a real 1600 m start) and cuts in to lane 1.
@@ -114,13 +130,15 @@ export function createRunnerViews(race, scene) {
       const bob = Math.abs(Math.sin(view.stride)) * BOB * RUNNER_SCALE;
       view.group.position.set(x, bob, z);
       view.group.rotation.y = heading;
-      view.shadow.position.set(x, 0.06, z);
+      view.shadow.position.set(x + SHADOW_NUDGE.x, 0.08, z + SHADOW_NUDGE.z);
 
-      if (view.marker) view.marker.position.y = 2.4 + Math.sin(time * 3) * 0.1;
-      // Kicking glow: your runner lights up gold.
-      const kicking = view.entrant.kicking;
-      view.material.emissive.setHex(kicking ? COLORS.gold : 0x000000);
-      view.material.emissiveIntensity = kicking ? 0.6 + Math.sin(time * 20) * 0.2 : 0;
+      if (view.entrant.isPlayer) {
+        view.marker.position.y = 2.4 + Math.sin(time * 3) * 0.1;
+        // Kicking glow: only YOUR runner lights up gold (its material is its own copy).
+        const kicking = view.entrant.kicking;
+        view.material.emissive.setHex(kicking ? COLORS.gold : 0x000000);
+        view.material.emissiveIntensity = kicking ? 0.5 + Math.sin(time * 12) * 0.15 : 0;
+      }
     }
   }
 
