@@ -1,15 +1,16 @@
 // The race display drawn over the 3D view (docs/UI_DIRECTION.md §4). Kept minimal so the race is the show:
 //   top-left     lap dots, LAP 2/4, the clock, and your pace
 //   top-right    your place ("3rd /8") and who's just ahead and behind
-//   bottom-left  today's conditions, your style, and your cards, as small tags
+//   bottom-left  today's conditions, your style, and your cards, as small tags (tap one to reread it)
 //   bottom-right the kick button, with your stamina as a ring around it
 //   bottom-mid   a gold KICK chip, only while you're kicking
+//   above kick   the camera button (stadium view <-> race camera)
 // Big numbers have a dark outline instead of a box behind them. (Menus and card picks are in screens.js.)
 
 import { formatTime, ordinal, raceMeters } from "../src/units.js";
 import { STYLES } from "../data/styles.js";
 import { tuning } from "../data/tuning.js";
-import { ICONS } from "./icons.js";
+import { ICONS, TYPE_ICONS } from "./icons.js";
 
 const HOT_ICE_FUZZ = 30; // HotIce: the pace readout can be up to this many seconds off
 const LOW_STAMINA = 0.25; // below this, the ring pulses
@@ -63,8 +64,41 @@ export function createHud(root) {
   const placeOf = element("span", "hud-num hud-num-of", placeRow);
   const gaps = element("div", "hud-small", placeBox);
 
-  // Bottom-left: conditions, style and cards.
-  const tags = element("div", "hud-tags", root);
+  // Bottom-left: conditions, style and cards. Tapping one pops up a small card above them to reread it.
+  const tagArea = element("div", "hud-tag-area", root);
+  const tags = element("div", "hud-tags", tagArea);
+  const peek = element("div", "peek", tagArea);
+  peek.hidden = true;
+  let tagInfo = []; // what each tag says when you open it
+  let peeking = -1; // which tag is open (-1 = none)
+
+  function openPeek(index) {
+    const info = tagInfo[index];
+    peeking = index;
+    peek.className = `peek ${info.className ?? ""}`;
+    peek.innerHTML = "";
+    const top = element("div", "card-top", peek);
+    element("span", "card-type", top, info.chip);
+    if (info.icon) element("span", "card-icon", top).insertAdjacentHTML("beforeend", ICONS[info.icon]);
+    element("div", "peek-name", peek, info.title);
+    element("div", "peek-text", peek, info.text);
+    element("div", "peek-close", peek, "Tap to close");
+    peek.hidden = false;
+    [...tags.children].forEach((tag, i) => tag.classList.toggle("open", i === index));
+  }
+  // Closes the peek. Returns true if it was open (so a tap on the track that closes it isn't also a kick).
+  function closePeek() {
+    if (peeking < 0) return false;
+    peeking = -1;
+    peek.hidden = true;
+    for (const tag of tags.children) tag.classList.remove("open");
+    return true;
+  }
+  peek.addEventListener("click", closePeek);
+  // A tap anywhere else in the race display closes it too.
+  window.addEventListener("pointerdown", (event) => {
+    if (peeking >= 0 && !tagArea.contains(event.target) && event.target.id !== "scene") closePeek();
+  });
 
   // Bottom-middle: the KICK chip.
   const kickChip = element("div", "kick-chip", root);
@@ -90,6 +124,12 @@ export function createHud(root) {
   kickButton.insertAdjacentHTML("beforeend", ICONS.shoe);
   const kickLabel = element("span", "kick-label", kickButton);
   const staminaText = element("span", "kick-stamina", kickButton);
+
+  // Above the kick button: switch between the stadium view and the race camera.
+  const cameraButton = element("button", "camera-button", root);
+  cameraButton.setAttribute("aria-label", "Switch camera (C)");
+  cameraButton.title = "Switch camera (C)";
+  cameraButton.insertAdjacentHTML("beforeend", ICONS.camera);
 
   const messages = element("div", "messages", root);
 
@@ -151,8 +191,26 @@ export function createHud(root) {
     const tagList = [race.condition ? race.condition.name : "No conditions", STYLES[runner.style].name, ...you.cards.map((held) => held.card.name)];
     if (tagList.join("|") !== tagText) {
       tagText = tagList.join("|");
+      tagInfo = [
+        race.condition
+          ? { chip: "Today", title: race.condition.name, text: race.condition.description }
+          : { chip: "Today", title: "No conditions", text: "A normal race: nothing special about the weather or the track today." },
+        { chip: "Your style", title: STYLES[runner.style].name, text: STYLES[runner.style].description, icon: "shoe" },
+        ...you.cards.map(({ card }) => ({
+          chip: card.type,
+          title: `"${card.name}"`,
+          text: card.text,
+          icon: TYPE_ICONS[card.type],
+          className: `type-${card.type.toLowerCase()}`,
+        })),
+      ];
       tags.innerHTML = "";
-      tagList.forEach((text, i) => element("span", i < 2 ? "tag" : "tag tag-card", tags, text));
+      tagList.forEach((text, i) => {
+        const tag = element("button", i < 2 ? "tag" : "tag tag-card", tags, text);
+        tag.addEventListener("click", () => (peeking === i ? closePeek() : openPeek(i)));
+      });
+      if (peeking >= tagList.length) closePeek();
+      else if (peeking >= 0) openPeek(peeking); // keep it open, with the tags rebuilt
     }
 
     // Kick button and stamina ring.
@@ -185,6 +243,7 @@ export function createHud(root) {
   // Hide the race display while the menus are up. Showing it again starts fresh for a new race.
   function setVisible(on) {
     root.classList.toggle("off", !on);
+    closePeek();
     if (!on) messages.innerHTML = "";
     if (on) {
       lastPlace = 0;
@@ -193,7 +252,7 @@ export function createHud(root) {
     }
   }
 
-  return { update, toast, setVisible, kickButton };
+  return { update, toast, setVisible, kickButton, cameraButton, closePeek };
 }
 
 // Turns a race event into a pop-up message about YOU (or null if it isn't worth showing).

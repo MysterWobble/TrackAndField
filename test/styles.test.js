@@ -46,7 +46,9 @@ test("Closer: slower early laps, more stamina saved, higher top speed on the las
 test("Front Runner: fast first lap, and more Race IQ means a smaller surge", () => {
   const hothead = runSolo(buildRunner("FR", { ...stats, raceIQ: 0 }, "frontRunner"), createRandom(1));
   const calm = runSolo(buildRunner("FR", { ...stats, raceIQ: 35 }, "frontRunner"), createRandom(1));
-  assert.ok(hothead.laps[0].lapTime < hothead.laps[1].lapTime, "lap 1 faster than lap 2");
+  // The same runner as a Pacer (no lap 1 surge). Lap 1 includes the standing start, so compare lap 1s.
+  const steady = runSolo(buildRunner("P", { ...stats, raceIQ: 0 }, "pacer"), createRandom(1));
+  assert.ok(hothead.laps[0].lapTime < steady.laps[0].lapTime, "lap 1 faster than the same runner without the surge");
   assert.ok(hothead.laps[0].lapTime < calm.laps[0].lapTime, "low Race IQ surges harder");
 });
 

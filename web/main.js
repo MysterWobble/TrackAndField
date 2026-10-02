@@ -35,6 +35,7 @@ import { buildCampus, hillTFitPoints } from "./campus.js";
 import { createRunnerViews } from "./runners.js";
 import { createKickTrail } from "./effects.js";
 import { createHud, messageFor } from "./hud.js";
+import { TYPE_ICONS } from "./icons.js";
 import { createScreens } from "./screens.js";
 import { backupCareer, loadCareer, saveCareer } from "./storage.js";
 
@@ -119,14 +120,93 @@ function fitCamera() {
   moveCamera(0);
 }
 
-// Glide toward the wanted view (smooth start and stop).
+// The race camera: over your runner's right shoulder, a few body-lengths back, looking up the track.
+// It follows smoothly (so the bends don't jerk it around), and only during races.
+const SHOULDER = {
+  back: 11, // meters behind your runner
+  up: 9.5, // camera height (your runner is about 6 m tall on screen), high enough to see over the pack
+  side: 2.2, // to the right, so you look past your runner's shoulder
+  ahead: 22, // looks at a point this far up the track...
+  lookHeight: 2, // ...at this height
+  fov: 55, // a wider lens up close (the stadium views use 38)
+  follow: 6, // how quickly it catches up with your runner (higher = tighter)
+  switchSeconds: 0.9,
+};
+const CAMERA_CHOICE_KEY = "1600m.raceCamera";
+let shoulderWanted = false;
+try {
+  shoulderWanted = localStorage.getItem(CAMERA_CHOICE_KEY) === "shoulder"; // remember the last choice
+} catch {
+  // storage blocked: just start in the stadium view
+}
+let followRunner = null; // your runner's view, set when a race starts
+let shoulderBlend = 0; // 0 = stadium view, 1 = race camera
+let shoulderPlaced = false;
+const shoulderPosition = new THREE.Vector3();
+const shoulderLookAt = new THREE.Vector3();
+const wantPosition = new THREE.Vector3();
+const wantLookAt = new THREE.Vector3();
+
+function toggleRaceCamera() {
+  shoulderWanted = !shoulderWanted;
+  hud.cameraButton.classList.toggle("on", shoulderWanted);
+  try {
+    localStorage.setItem(CAMERA_CHOICE_KEY, shoulderWanted ? "shoulder" : "stadium");
+  } catch {
+    // fine: it just won't be remembered
+  }
+}
+
+// Where the race camera wants to be for your runner right now.
+function shoulderTargets(group) {
+  const heading = group.rotation.y; // runners face +x, turned by their heading
+  const forwardX = Math.cos(heading);
+  const forwardZ = -Math.sin(heading);
+  const rightX = Math.sin(heading);
+  const rightZ = Math.cos(heading);
+  const { x, z } = group.position;
+  wantPosition.set(x - forwardX * SHOULDER.back + rightX * SHOULDER.side, SHOULDER.up, z - forwardZ * SHOULDER.back + rightZ * SHOULDER.side);
+  wantLookAt.set(x + forwardX * SHOULDER.ahead, SHOULDER.lookHeight, z + forwardZ * SHOULDER.ahead);
+}
+
+// Glide toward the wanted view (smooth start and stop): the stadium views, blended with the race camera.
 const lookAt = new THREE.Vector3();
 const position = new THREE.Vector3();
+const ease = (t) => t * t * (3 - 2 * t);
 function moveCamera(dt) {
   const step = dt / GLIDE_SECONDS;
   viewBlend = wideWanted ? Math.min(1, viewBlend + step) : Math.max(0, viewBlend - step);
-  const t = viewBlend * viewBlend * (3 - 2 * viewBlend);
-  placeCamera(position.lerpVectors(VIEWS.race.position, VIEWS.wide.position, t), lookAt.lerpVectors(VIEWS.race.lookAt, VIEWS.wide.lookAt, t));
+  const t = ease(viewBlend);
+  position.lerpVectors(VIEWS.race.position, VIEWS.wide.position, t);
+  lookAt.lerpVectors(VIEWS.race.lookAt, VIEWS.wide.lookAt, t);
+
+  const shoulderOn = shoulderWanted && !wideWanted && followRunner !== null;
+  const shoulderStep = dt / SHOULDER.switchSeconds;
+  shoulderBlend = shoulderOn ? Math.min(1, shoulderBlend + shoulderStep) : Math.max(0, shoulderBlend - shoulderStep);
+  if (followRunner) {
+    shoulderTargets(followRunner.group);
+    if (!shoulderPlaced) {
+      shoulderPosition.copy(wantPosition);
+      shoulderLookAt.copy(wantLookAt);
+      shoulderPlaced = true;
+    } else {
+      const catchUp = 1 - Math.exp(-dt * SHOULDER.follow);
+      shoulderPosition.lerp(wantPosition, catchUp);
+      shoulderLookAt.lerp(wantLookAt, catchUp);
+    }
+    if (followRunner.marker) followRunner.marker.visible = shoulderBlend < 0.5; // the arrow over you would block the view
+  }
+  const s = ease(shoulderBlend);
+  if (s > 0) {
+    position.lerp(shoulderPosition, s);
+    lookAt.lerp(shoulderLookAt, s);
+  }
+  const fov = 38 + (SHOULDER.fov - 38) * s;
+  if (camera.fov !== fov) {
+    camera.fov = fov;
+    camera.updateProjectionMatrix();
+  }
+  placeCamera(position, lookAt);
 }
 
 // Menus get the wide view; races get the race view.
@@ -282,6 +362,8 @@ async function startRace({ seed, rng, runner, runnerIndex, condition, conditionK
   cardRandom = (moment) => createRandom(seed * 1000 + moment + 7);
   runnerLayer.clear();
   runnerViews = createRunnerViews(race, runnerLayer);
+  followRunner = runnerViews.you; // the race camera follows your runner
+  shoulderPlaced = false; // ...starting right behind them, not gliding in from the last race
   lapsOffered = 0;
   logShown = 0;
   tickBank = 0;
@@ -292,8 +374,6 @@ async function startRace({ seed, rng, runner, runnerIndex, condition, conditionK
   state = "running";
 }
 
-// One icon per card type (web/icons.js).
-const CARD_ICONS = { Preparation: "clipboard", Strategy: "route", Encouragement: "heart", Pacing: "stopwatch", Push: "bolt", Unique: "star" };
 
 // Pause and offer cards. moment: 0 = before the race, 1-3 = after that lap.
 async function pickCard(moment) {
@@ -307,7 +387,7 @@ async function pickCard(moment) {
       tag: card.type,
       name: `"${card.name}"`,
       text: [card.text],
-      icon: CARD_ICONS[card.type],
+      icon: TYPE_ICONS[card.type],
       help: helpFor(card.effects, card.multiply, card),
       className: `type-${card.type.toLowerCase()}`,
     })),
@@ -436,7 +516,10 @@ function setKick(on) {
 }
 window.addEventListener("keydown", (event) => {
   if ((event.code === "Space" || event.code === "KeyK") && !event.repeat) setKick(true);
+  if (event.code === "KeyC" && !event.repeat && race) toggleRaceCamera();
 });
+hud.cameraButton.addEventListener("click", toggleRaceCamera);
+hud.cameraButton.classList.toggle("on", shoulderWanted); // the remembered choice
 window.addEventListener("keyup", (event) => {
   if (event.code === "Space" || event.code === "KeyK") setKick(false);
 });
@@ -444,7 +527,10 @@ hud.kickButton.addEventListener("pointerdown", (event) => {
   event.preventDefault();
   setKick(true);
 });
-canvas.addEventListener("pointerdown", () => setKick(true));
+canvas.addEventListener("pointerdown", () => {
+  if (hud.closePeek()) return; // this tap just closes the card peek, it isn't a kick
+  setKick(true);
+});
 window.addEventListener("pointerup", () => setKick(false));
 window.addEventListener("pointercancel", () => setKick(false));
 window.addEventListener("blur", () => setKick(false)); // switching apps shouldn't leave you kicking forever

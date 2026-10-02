@@ -190,6 +190,9 @@ export function wallText(text, height, color, x, y, z, facing = "+z") {
 
 // --- Bleachers ---
 
+// How big the fans are compared to real life (1.5 = 50% bigger, so they read from the stadium camera).
+const CROWD_SCALE = 1.5;
+
 // Aluminum bleachers built facing north (rising toward +z), with an optional press box and crowd.
 // `fill` = how full the seats are (0 to 1).
 function bleachers({ length, tiers, start, fill, pressBox }, random) {
@@ -232,8 +235,9 @@ function bleachers({ length, tiers, start, fill, pressBox }, random) {
   }
 
   // The crowd: a capsule body and a ball head each, as two instanced meshes (2 draw calls).
-  const bodies = new THREE.InstancedMesh(new THREE.CapsuleGeometry(0.26, 0.42, 2, 6), new THREE.MeshLambertMaterial({ flatShading: true }), seats.length);
-  const heads = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.22, 0), new THREE.MeshLambertMaterial({ flatShading: true }), seats.length);
+  const size = CROWD_SCALE;
+  const bodies = new THREE.InstancedMesh(new THREE.CapsuleGeometry(0.26 * size, 0.42 * size, 2, 6), new THREE.MeshLambertMaterial({ flatShading: true }), seats.length);
+  const heads = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.22 * size, 0), new THREE.MeshLambertMaterial({ flatShading: true }), seats.length);
   const color = new THREE.Color();
   const fans = seats.map(([x, y, z], i) => {
     bodies.setColorAt(i, color.setHex(CROWD.shirts[Math.floor(random() * CROWD.shirts.length)]));
@@ -249,11 +253,11 @@ function bleachers({ length, tiers, start, fill, pressBox }, random) {
     if (time - lastUpdate < 0.12) return;
     lastUpdate = time;
     fans.forEach((fan, i) => {
-      const bob = Math.max(0, Math.sin(time * fan.rate + fan.phase)) * 0.12;
-      place.position.set(fan.x, fan.y + 0.48 + bob, fan.z);
+      const bob = Math.max(0, Math.sin(time * fan.rate + fan.phase)) * 0.12 * size;
+      place.position.set(fan.x, fan.y + 0.48 * size + bob, fan.z);
       place.updateMatrix();
       bodies.setMatrixAt(i, place.matrix);
-      place.position.y = fan.y + 1.05 + bob;
+      place.position.y = fan.y + 1.05 * size + bob;
       place.updateMatrix();
       heads.setMatrixAt(i, place.matrix);
     });

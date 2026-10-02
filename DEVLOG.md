@@ -286,7 +286,27 @@ Short entries, every session. This becomes the portfolio and essay material.
 - Fixed: the old style picker would have used only 3 of 6 styles; the new `hairStyleFor` spreads all 6 across the field.
 - About 880–960 triangles per runner (the rounded shoes), still 13–14 draw calls; budget is 3,000.
 
-**Next:** the designers check the runners in a race (they're small from the race camera, so overall shape and motion matter most). Then: rarity colors and sounds (step 6), or deploy (step 8). A player picking cards at random wins about 10% (average 4th). Computer runners use the same cards, so the Speed nerf hits them too. Stacked Determination builds that kick all race win 1–4%, so the buff doesn't bring back the old exploit.
+**Next:** the designers check the runners in a race (they're small from the race camera, so overall shape and motion matter most).
+
+## 2026-10-02 (night): Front Runner nerf and the race camera
+**Designer asks:** Front Runner is a little too strong at the beginning (reduce by about 5%?); a race camera on your runner's shoulder.
+
+**Front Runner (simulated first, 300 races of computer runners):** Front Runners were usually near the front after lap 1 (2.75th on average) but finished mid-pack (4.0th) and won 16%, about an even share. Pacers are actually the strongest finishers (22% wins).
+- Cutting the surge by exactly 5% changed nothing visible.
+- **Decision: halve the lap 1 surge** (effort 0.07 → 0.035, so about 1% faster than their pace instead of 2%). Simulated: they sit 3.1st after lap 1 and win 14%, an even share.
+- The style test now compares a Front Runner's lap 1 with the same runner as a Pacer (lap 1 also includes the standing start).
+
+**Race camera:**
+- A camera button (above the kick button) or the C key switches between the stadium view and a camera over your runner's right shoulder, looking up the track.
+- It follows smoothly through the bends, glides in and out (about 0.9 s), and widens the lens up close. The arrow over your runner hides while it's on.
+- The menus always use the stadium view. Your choice is remembered in this browser.
+- Settings (distance, height, lens) are at the top of the race camera code in `web/main.js`.
+
+**Also:** the fans in the stands are 50% bigger, so they read from the stadium camera (`CROWD_SCALE` in `web/stadium.js`). The seat spacing already had room, so they don't overlap.
+
+**Card peek (designer ask):** tap any tag in the lower left of the race display (your cards, today's conditions, or your running style) and a small card pops up above the tags with its full text. Tap it, tap the tag again, or tap anywhere to close. A tap on the track that closes it doesn't also start a kick. The card-type icons moved to `web/icons.js` (`TYPE_ICONS`) so the card picks and the race display share them.
+
+**Next:** the designers try the race camera in a full race. Then: rarity colors and sounds (step 6), or deploy (step 8). A player picking cards at random wins about 10% (average 4th). Computer runners use the same cards, so the Speed nerf hits them too. Stacked Determination builds that kick all race win 1–4%, so the buff doesn't bring back the old exploit.
 
 ---
 

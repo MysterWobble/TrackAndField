@@ -31,6 +31,13 @@ export const ICONS = {
     <rect x="2.6" y="17.2" width="18.8" height="3.6" rx="1.6" ${base}/>
     <path d="M2.6 10.4 Q2.6 8 5 8 H6.4 V17.6 H2.6 Z" ${facet}/>`),
 
+  // A camera, for switching views.
+  camera: svg(`
+    <rect x="2.5" y="7" width="19" height="13" rx="2.5" ${base}/>
+    <path d="M8 7 L9.6 3.8 H14.4 L16 7 Z" ${base}/>
+    <circle cx="12" cy="13.5" r="4.2" ${base}/>
+    <circle cx="12" cy="13.5" r="2" ${facet}/>`),
+
   // Card types (one icon each), and training.
   // Preparation: a clipboard checklist.
   clipboard: svg(`
@@ -62,6 +69,9 @@ export const ICONS = {
     <rect x="2.4" y="12.5" width="4.4" height="5" rx="1.6" ${facet}/>
     <rect x="17.2" y="12.5" width="4.4" height="5" rx="1.6" ${facet}/>`),
 };
+
+// One icon per card type (card picks, and the card peek in the race display).
+export const TYPE_ICONS = { Preparation: "clipboard", Strategy: "route", Encouragement: "heart", Pacing: "stopwatch", Push: "bolt", Unique: "star" };
 
 // A five-pointed star as an SVG path. With `rightHalf`, just the right half (for the darker facet).
 function starPath(cx, cy, outer, inner, rightHalf = false) {
