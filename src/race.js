@@ -19,7 +19,8 @@ import { rollDetermination } from "./determination.js";
 import { planFor, speedBonuses, staminaFactor, wantsToChase, CHASE } from "./styles.js";
 import { STYLES } from "../data/styles.js";
 import { addBonuses, buildRunner, withBonuses } from "./runner.js";
-import { applyCard, cardBonuses, offerCards } from "./cards.js";
+import { applyCard, cardBonuses, momentsFor, offerCards } from "./cards.js";
+import { CARDS } from "../data/cards.js";
 
 // A pace plan says how hard to run each lap: 0 = average pace, 1 = top speed, 0.5 = halfway between.
 export const PLANS = {
@@ -39,6 +40,14 @@ function mistakeFactor(runner) {
 // How far off a computer runner's kick timing can be. Race IQ makes it more accurate.
 function kickMisjudge(runner) {
   return tuning.computerKickMisjudge * mistakeFactor(runner);
+}
+
+// A computer runner's card for this moment (0 = before the race, 1-3 = after that lap): a random card
+// with no special rules (no "until you pass two runners", no rivalry or position requirements).
+const PLAIN_CARDS = CARDS.filter((card) => !card.special && !card.rivalryOnly && !card.minPosition && !card.requires);
+function computerCardFor(moment, rng) {
+  const fits = PLAIN_CARDS.filter((card) => (momentsFor(card.when) ?? []).includes(moment));
+  return fits.length ? rng.pick(fits) : null;
 }
 
 function createEntrant(runner, isPlayer, plan, rng, baseRunner = runner) {
@@ -61,13 +70,12 @@ function createEntrant(runner, isPlayer, plan, rng, baseRunner = runner) {
     noBoxUntil: 0, // race time before which they can't get boxed in again
     kickTiming: isPlayer ? 0 : rng.range(-1, 1) * kickMisjudge(runner), // + means they'll go too early
     reachedPace: false, // true once they first get up to average pace
-    nextRollIn: 0, // seconds until the next Determination roll
-    lastSuccessLap: null, // Determination can only succeed once per lap
+    lastRollLap: null, // Determination rolls once per lap (the first time stamina is low that lap)
     ranOutAt: null, // meters where stamina first hit 0
     finishTime: null,
     laps: [],
     events: [], // this runner's Determination successes
-    cards: [], // cards picked (player only): { card, pickedAt, ... }
+    cards: [], // cards picked: { card, pickedAt, ... } (computer runners get plain ones, see computerCardFor)
     cardFlags: {}, // switches from active cards: hideStats, paceFuzz, matchRunnerAhead
     fallenFor: 0, // seconds left on the ground after tripping ("I won't stop here")
   };
@@ -143,8 +151,18 @@ export function createRace(player, rivals, rng, plan = PLANS.even, condition = n
     e.cardFlags = flags;
   }
 
+  // Computer runners pick a card at the same moments you do. Plain cards never change once picked,
+  // so their runner is rebuilt once here instead of every tick.
+  function giveComputerCard(e, moment) {
+    if (e.isPlayer || !tuning.computerRunnersGetCards) return;
+    const card = computerCardFor(moment, rng);
+    if (!card) return;
+    applyCard(race, e, card, rng);
+    refreshCards(e);
+  }
+
   function moveEntrant(e, index, startDistances) {
-    if (e.cards.length) refreshCards(e);
+    if (e.isPlayer && e.cards.length) refreshCards(e); // your cards can change mid-race ("until you pass two runners")
     const runner = e.runner;
     const lapIndex = lapOf(e.distance);
 
@@ -298,22 +316,16 @@ export function createRace(player, rivals, rng, plan = PLANS.even, condition = n
     e.distance += meters;
     if (e.distance >= finishLine) e.finishTime = race.time + tickTime;
 
-    // 4. Determination: while stamina is low, roll every few seconds (max one success per lap).
+    // 4. Determination: the first time each lap that stamina is low, roll once (so 30 Determination = a real 30% per lap).
     const lowStamina = e.stamina < tuning.determinationLowStamina * runner.maxStamina;
-    if (!lowStamina) {
-      e.nextRollIn = 0; // roll straight away the next time stamina drops low
-    } else {
-      e.nextRollIn -= tickTime;
-      if (e.nextRollIn <= 0 && e.lastSuccessLap !== lapIndex) {
-        e.nextRollIn = tuning.determinationRollEverySeconds;
-        const bonus = rollDetermination(runner, rng);
-        if (bonus > 0) {
-          e.stamina = Math.min(e.stamina + bonus, runner.maxStamina);
-          e.lastSuccessLap = lapIndex;
-          const event = { type: "determination", entrant: e, time: race.time, distance: e.distance, lap: lapIndex + 1, bonus };
-          e.events.push(event);
-          race.log.push(event);
-        }
+    if (lowStamina && e.lastRollLap !== lapIndex) {
+      e.lastRollLap = lapIndex;
+      const bonus = rollDetermination(runner, rng);
+      if (bonus > 0) {
+        e.stamina = Math.min(e.stamina + bonus, runner.maxStamina);
+        const event = { type: "determination", entrant: e, time: race.time, distance: e.distance, lap: lapIndex + 1, bonus };
+        e.events.push(event);
+        race.log.push(event);
       }
     }
 
@@ -395,7 +407,10 @@ export function createRace(player, rivals, rng, plan = PLANS.even, condition = n
       });
 
       entrants.forEach((e, i) => {
-        if (e.laps.length > startLaps[i]) e.laps[e.laps.length - 1].position = race.positionOf(e);
+        if (e.laps.length > startLaps[i]) {
+          e.laps[e.laps.length - 1].position = race.positionOf(e);
+          if (e.laps.length < tuning.laps) giveComputerCard(e, e.laps.length); // after laps 1-3
+        }
       });
 
       race.finished = entrants.every((e) => e.finishTime !== null);
@@ -432,6 +447,7 @@ export function createRace(player, rivals, rng, plan = PLANS.even, condition = n
     },
   };
 
+  for (const e of entrants) giveComputerCard(e, 0); // computer runners' pre-race cards
   return race;
 }
 

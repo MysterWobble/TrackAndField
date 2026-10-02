@@ -199,12 +199,13 @@ gltf.scene.traverse((o) => {
   - **Sparks** become a handful of soft warm motes: short-lived additive sprites or `Points`.
   - **Speed lines** in `cream` at low opacity.
   - **Edge glow** is a soft gold vignette in CSS over the canvas, which costs nothing.
+- **The second exception is the Big Moment** (UI_DIRECTION.md §8): when you win or set a new personal best, about 26 paper confetti pieces in `cream`, `gold`, the school red and lavender flutter down once over the results card (about 1.2 s, DOM/CSS only, nothing in the 3D scene). No confetti when the device asks for reduced motion.
 
 ## 10. UI (HTML/CSS)
 
 ```css
 :root {
-  --panel: #1E3A33; --panel-deep: #142525;
+  --panel: #2C3E73; --panel-deep: #1B2650;   /* school navy (v0.4; was dark green) */
   --cream: #F4ECD8; --ink: #22304A;
   --gold: #E8B84B; --olive: #8A9A5B; --you: #34B98A;
   --radius: 16px; --pill: 999px;
@@ -213,7 +214,12 @@ gltf.scene.traverse((o) => {
 }
 ```
 
-- **Panels:** dark green rounded cards with cream text and a soft shadow. Light cards use a cream background with ink text.
+- **Panels:** school navy paper panels with cream text and a deeper navy layer offset below (UI_DIRECTION.md §6). Light cards use a cream background with ink text.
+- **Running-track touches (v0.4, from playtesting):** the UI should feel like a track.
+  - Card numbers are painted lane numbers (red blocks, white numbers).
+  - Cards and panels have a small track bend in the bottom-right corner (red lanes, white lines).
+  - Panels have a white lane line inside the edge.
+  - The stamina ring is a little two-lane red track with a white start line at the top.
 - **Buttons:** pill shaped. Selected = 2px gold outline. Primary action = gold fill with ink text.
 - **Toggles:** olive track with a cream knob. **Icons:** simple cream line icons with a ~2px stroke.
 - **Type sizes at 844 × 390:** headings 22–26px at weight 700, body 15–16px at weight 500, labels 12px at weight 600. Nothing goes smaller than 12px.

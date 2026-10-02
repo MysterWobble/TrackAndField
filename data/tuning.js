@@ -21,11 +21,12 @@ export const tuning = {
   staminaPerPoint: 1.25, // tank size = baseStamina + (points × this)
   drainPerLapAtAveragePace: 25,
   extraDrainPerLapPerStaminaPoint: 0.0625, // with 1.25 per point, each Stamina point is worth 1 spare stamina over a race
-  drainMultiplierAtTopSpeed: 2.5, // running at top speed drains this many times faster than average pace...
+  drainMultiplierAtTopSpeed: 4, // running at top speed drains this many times faster than average pace...
+                                // (was 2.5, but then kicking the WHOLE race won 73% of races; at 4 a full tank lasts about 1.5 laps of kicking)
   surgeDrain: 6, // running above your normal pace without kicking (surging, fighting back, drifting fast): every 1% faster uses 6% more stamina
   drainCurvePower: 2, // shape of the cost between average pace and top speed (2 = small pushes are cheap, 1 = even, 0.5 = any push costs a lot)
   pushSpeedDrain: 3, // speed from cards is you pushing harder: every 1% faster uses 3% more stamina (new shoes excepted)
-  kickSprintSavingPerPoint: 0.02, // ...minus this much per Kick point (strong kickers sprint more efficiently: 25 Kick -> 2.0)
+  kickSprintSavingPerPoint: 0.02, // ...minus this much per Kick point (strong kickers sprint more efficiently: 25 Kick -> 3.5)
   lowestSprintDrain: 1.5, // ...but never less than this
 
   // --- Speeding up and slowing down (mph per second) ---
@@ -39,11 +40,10 @@ export const tuning = {
   exhaustedFloor: 0.5, // ...until you're down to 50% of it
 
   // --- Determination ---
-  determinationLowStamina: 0.35, // start rolling when stamina drops below 35% of the tank
-  determinationRollEverySeconds: 5, // roll again this often while still low
+  determinationLowStamina: 0.35, // the first time each lap your stamina drops below 35% of the tank, you roll once
   determinationBaseBonus: 5, // a successful roll gives this much stamina...
-  determinationBonusPerPoint: 0.6, // ...plus this much per Determination point (30 points -> +23 total)
-  // (chance of success = Determination points as a percent; 30 points = 30%. Max one success per lap.)
+  determinationBonusPerPoint: 0.4, // ...plus this much per Determination point (30 points -> +17 total, 35 -> +19)
+  // (chance of success = Determination points as a percent; 30 points = 30%. One roll per lap, so 30% really is 30%.)
 
   // --- The field (computer runners) ---
   computerRunners: 7,
@@ -51,6 +51,8 @@ export const tuning = {
   strongerRunnersMax: 2,
   strongerExtraPoints: [5, 15], // ...this many more (random in this range)
   weakerFewerPoints: [0, 20], // everyone else has this many FEWER points than you
+  computerRunnersGetCards: true, // they pick a card at the same moments you do (before the race, after laps 1-3):
+                                 // a random card with no special rules
   computerKickMisjudge: 0.6, // a Race IQ 0 runner can start their kick up to 60% too early or too late
 
   // --- Race IQ ---

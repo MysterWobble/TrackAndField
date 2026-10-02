@@ -178,6 +178,80 @@ Short entries, every session. This becomes the portfolio and essay material.
 - **Stands match the photos:** the home side is 64 m long, just east of center; the visitor side is 50 m long, west of center, with its own little press box. Long jump runways were added in the east curve, and the west curve is paved red for the high jump. These replace the shot put circle, which isn't in the photos.
 **Next:** the designers check the new layout, then the UI direction.
 
+## 2026-10-01 (night): The race screen, in the school colors (UI direction, part 1)
+**Built:** the race display from `docs/UI_DIRECTION.md` §4. The interface panels switch from dark green to the school navy.
+- **Top-left:** lap dots (finished laps filled, the current one pulsing), LAP 2/4, and the clock in big outlined numbers. Each digit sits in a fixed-width box so the clock doesn't wobble.
+- **Top-right:** your place ("1st /8"), which lands with a little bounce when it changes.
+- **Bottom-right:** the kick button with your stamina as a ring around it (approved earlier). The ring is cream, turns gold while you kick, pulses below 25%, and is dashed when Flow State hides it. The button turns gray when you're too tired.
+- **Bottom-middle:** a gold KICK chip that springs in while you kick.
+- **Bottom-left:** today's conditions, your style, and your cards as small tags.
+- **Icons:** original two-tone icons (stopwatch, lap flag, medal, running shoe) in `web/icons.js`.
+- **Reduced motion:** pulsing and bouncing switch off when the device asks for less motion.
+
+**Decisions made (and why):**
+- **Kept a few small readouts the guide would leave out:** pace (the HotIce card scrambles it, so it has to be on screen) and the gaps to the runners just ahead and behind (rival tracking). They're small outlined text, not boxes. The designers can drop them.
+- **Lap splits moved** from a list on screen to a pop-up as each lap finishes; the full splits are on the results screen.
+
+**Next:** card picks (run path strip, select then Continue), then the menus and the Big Moment results.
+
+## 2026-10-01 (night, later): Card picks (UI direction, part 2)
+**Built:** `docs/UI_DIRECTION.md` §5 for every choice screen (card picks, runner pick, training).
+- **Select, then Continue:** tap a card and it lifts with a gold edge while the others dim; then tap Continue. This stops accidental picks mid-race. On a keyboard: press 1-3 to select, then Enter (or the same number again).
+- **Run path strip** on card picks: Start → Lap 1 → Lap 2 → Lap 3 → Finish, with passed stops filled and the current one pulsing.
+- **Cards:** cream paper on a darker paper layer, a colored type chip, a two-tone icon, a bigger title, and the effect text. They spring in one after another.
+- **One color and icon per card type:** Preparation navy clipboard, Strategy sky route, Encouragement plum heart, Pacing oak stopwatch, Push red bolt, Unique lavender star. Runners get a shoe and training gets a dumbbell. Green and gold are never used, since they mean "you" and "kicking".
+- **Buttons:** pills on a darker offset layer that squash when pressed. Gold for the main action, navy for the rest.
+
+**Decisions made (and why):**
+- **The run path has 5 stops, not 6.** The guide lists "Lap 4" and "Finish" separately, but they're the same moment (the end of lap 4).
+- **Unpicked cards dim by darkening, not by fading.** See-through cards let the stadium show through and looked messy.
+- **On phone-size screens** the card icon moves up next to the number, so all three runner cards and the Continue button fit without scrolling.
+
+## 2026-10-01 (night, latest): Menus and the Big Moment (UI direction, part 3)
+**Built:**
+- **Paper panels** for the home screen and confirmations: navy, a deeper navy layer offset below, a dashed inner outline like a lane marking, and a little spring when they appear. The home panel has the "1600m" logo in big outlined letters and four stat tiles (personal best, rain best, races run, training points).
+- **The Big Moment results card** (`docs/UI_DIRECTION.md` §8): a cream card with a red ribbon showing your place ("4th of 8"), your time counting up and landing with a bounce, a gold badge for a new personal best (or a runner best), and a real results table. Your row has a You-green bar and your rival's has a red one. On phone-size screens it splits into two columns, with your result on the left and the table on the right.
+- **Confetti** for a win or a new personal best: paper pieces in cream, gold, red and lavender, falling once. It's added to the style guide §9 as the second exception to "calm, no particles", after the kick.
+
+**Decisions made (and why):**
+- **One card for results and personal bests**, not two pop-ups in a row. The personal best is a badge on the results card, so you see everything at once.
+- **Browser wording for the personal best line.** The badge already says "New personal best!", so the line under it adds the detail ("25.9s faster than your old best, 7:08.5"). The terminal keeps its own wording.
+
+**Next:** the designers try it. After that: the Quaternius runner models (part 4b) and the real-phone test (part 5).
+
+## 2026-10-02: First playtest, and the balance fixes it led to
+**Designer feedback:** races are far too easy (winning by about 30 seconds); stats need explaining (on the menu, and a ? on cards); Determination is broken when you build it (kicked all race and never dropped below about 20% stamina); the UI should feel more like running (white lane lines on the kick button and cards).
+
+**What the simulations showed** (a new playtest script, 100–150 races per row):
+- **Kicking the whole race was the best strategy.** A kick cost only 2.5× normal stamina, so a full tank lasted about 2.6 laps of sprinting. Kicking all race won 73% of races with no cards, and 96% with random cards (68 s ahead on average).
+- **Determination rerolled every 5 seconds while you were low,** so a "35% chance" was really about 90% per lap, refilling up to 26 stamina. A Determination-35 build kicking all race won 100% of races, with its lowest stamina around 16–24% (matching the playtest).
+- **Cards were most of the easy wins:** a smart player with no cards won 15–22%; with random cards about 70%. Computer runners never got cards.
+
+**Decisions made (designers picked from simulated options):**
+- **Kicks cost 4× stamina** (was 2.5×). A full tank now lasts about 1.5 laps of kicking. Kicking all race went from 73% wins to 0%.
+- **Determination rolls once per lap**, the first time you're low that lap, so 35 Determination is a real 35% chance. The refill is halved: 5 + 0.3 per point (35 → +15.5 stamina). Stacked Determination builds that kick all race now win about 0–1%.
+- **Computer runners get 4 cards like you** (one before the race, one after each of laps 1–3): a random card with no special rules. This is the hard option. A player picking cards at random wins about 13% (average 4th place); good picks and a well-timed kick should win more. The gentler option was 2 cards (about 27%).
+
+**UI from the feedback:**
+- **"How stats work"** on the home screen, explaining all six stats in plain words (`data/statHelp.js`, editable text).
+- **A ? on every card** (card picks, runners, training) that opens a bubble explaining the stats that card touches, plus a note that card speed costs stamina. Tapping the ? never picks the card.
+- **Running-track touches:**
+  - card numbers painted like red lane numbers;
+  - a small red track bend with white lane lines in the corner of cards and panels;
+  - a white lane line inside panels;
+  - the stamina ring drawn as a two-lane red track with a white start line.
+- **Small fixes:** cards are now divs (so the ? can sit inside them); pressing Enter on the picked card confirms it.
+
+**Next:** the designers play a few races at the new difficulty. If it's too hard, the quickest dial is how many cards computer runners get.
+
+## 2026-10-02 (later): Second playtest tweaks
+**Designer asks:** nerf Speed by about 5% on all cards; slightly buff the stamina Determination gives.
+**Changed:**
+- **Every card's Speed is about 5% weaker:** +20 → +19, +10 → +9.5, +30 → +28.5. For +15 the exact 5% would be +14.25, so it became +14.5 to keep the card text tidy. Top Speed cards are unchanged.
+- **Determination refill: 5 + 0.4 per point** (was 0.3): 35 Determination → +19 stamina (was +15.5; before the first playtest it was +26). Still one roll per lap.
+
+**Simulated (150 races):** about the same as before. A player picking cards at random wins about 10% (average 4th). Computer runners use the same cards, so the Speed nerf hits them too. Stacked Determination builds that kick all race win 1–4%, so the buff doesn't bring back the old exploit.
+
 ---
 
 ## Milestones

@@ -231,3 +231,20 @@ test("HotIce: stamina drains 20% slower", () => {
 test("Less than a lap left! only shows up after lap 3", () => {
   assert.deepEqual(momentsFor(card("Less than a lap left!").when), [3]);
 });
+
+test("computer runners pick 4 plain cards: one before the race and one after each of laps 1-3", () => {
+  for (let seed = 1; seed <= 10; seed++) {
+    const rng = createRandom(seed);
+    const you = makeYourRunners(rng)[0];
+    const race = createRace(you, makeField(you.points, rng), rng);
+    while (!race.finished) race.step();
+    for (const e of race.entrants.filter((entrant) => !entrant.isPlayer)) {
+      assert.equal(e.cards.length, 4, `${e.runner.name} should have 4 cards`);
+      e.cards.forEach((held, moment) => {
+        assert.ok(!held.card.special && !held.card.rivalryOnly, `${held.card.name} has special rules`);
+        assert.ok(momentsFor(held.card.when).includes(moment), `${held.card.name} doesn't fit moment ${moment}`);
+      });
+    }
+    assert.equal(race.player.cards.length, 0, "you only get the cards you pick");
+  }
+});

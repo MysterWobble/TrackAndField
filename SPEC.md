@@ -33,7 +33,7 @@ Starter set. Rename or cut.
 - **Top Speed**: The highest speed at which a certain runner can run  
 - **Stamina:** A resource that depletes at a rate according to speed, (how long you can run, depending on your speed)  
 - **Kick:** The rate at which you speed up (Ex: 5MPH/1Sec)  
-- **Determination:** The chance to gain bonus stamina when reaching low stamina  
+- **Determination:** The chance to gain bonus stamina when reaching low stamina (one roll per lap, the first time you're low that lap)  
 - **Race IQ:** better positioning and strategy (Ex. Less time a runner spends boxed in, better consistent pace for the whole race, less time runners spend running on an outside lane.  
 - **Starting 1600 time for a new runner:** 7:00 *(suggested: around 6:00)*
 
@@ -52,7 +52,7 @@ Used by you and CPU runners. Each CPU runner gets a style and a name.
 
 ## 6\. Choices (The Heart of the Game)
 
-Each pick is 1 of 3 cards. Cards have a **rarity** (common / rare / epic) and a **tradeoff** where possible. Cards are picked After each lap, or at the start of the race (Cards at the start of a race have a much greater effect)
+Each pick is 1 of 3 cards. Cards have a **rarity** (common / rare / epic) and a **tradeoff** where possible. Cards are picked After each lap, or at the start of the race (Cards at the start of a race have a much greater effect). Computer runners pick cards at the same moments (a random card with no special rules), so the field plays by the same rules as you.
 
 | When | Card type | Card Effects |
 | :---- | :---- | :---- |

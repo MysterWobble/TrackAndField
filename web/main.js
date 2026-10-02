@@ -18,7 +18,6 @@ import { formatTime, ordinal } from "../src/units.js";
 import {
   applyTraining,
   gainsText,
-  newBestLines,
   newCareer,
   offerTraining,
   personalBest,
@@ -29,6 +28,7 @@ import {
 import { CONDITIONS, CONDITION_KEYS } from "../data/conditions.js";
 import { STYLES } from "../data/styles.js";
 import { tuning } from "../data/tuning.js";
+import { CARD_NOTES, HELP_LABELS, STAT_HELP } from "../data/statHelp.js";
 import { COLORS } from "./colors.js";
 import { buildStadium, stadiumFitPoints } from "./stadium.js";
 import { buildCampus, hillTFitPoints } from "./campus.js";
@@ -159,6 +159,16 @@ function save() {
 
 const bestText = (time) => (time === null ? "--" : formatTime(time));
 
+// The explanations behind the ? on cards (data/statHelp.js).
+const ALL_STATS_HELP = STAT_NAMES.map((stat) => ({ name: HELP_LABELS[stat], text: STAT_HELP[stat] }));
+// What each stat a card or training session touches does. Cards with only special rules explain themselves.
+function helpFor(effects = {}, multiply = {}, card = null) {
+  const stats = [...new Set([...Object.keys(effects), ...Object.keys(multiply)])].filter((stat) => STAT_HELP[stat]);
+  const help = stats.map((stat) => ({ name: HELP_LABELS[stat], text: STAT_HELP[stat] }));
+  if (card && effects.speed > 0) help.push({ name: "Note", text: card.freeSpeed ? CARD_NOTES.freeSpeed : CARD_NOTES.pushSpeed });
+  return help;
+}
+
 // One runner, as a choice card.
 function runnerChoice(index) {
   const runner = runnerFromCareer(career, index);
@@ -167,6 +177,8 @@ function runnerChoice(index) {
   return {
     tag: `Best ${bestText(best)}${rainBest === null ? "" : ` · rain ${formatTime(rainBest)}`}`,
     name: STYLES[runner.style].name,
+    icon: "shoe",
+    help: ALL_STATS_HELP,
     text: [
       STAT_NAMES.map((stat) => `${STAT_LABELS[stat]} ${runner.points[stat]}`).join(" · "),
       `Average ${formatTime(runner.averagePace)} · Top ${formatTime(runner.topSpeedPace)} · Stamina ${Math.round(runner.maxStamina)}`,
@@ -184,18 +196,35 @@ async function home() {
     lines.push({ text: "Welcome! Here's your career. You have 3 runners, and they get better as you train.", tone: "good" });
     welcome = false;
   }
-  lines.push(`Personal best ${bestText(personalBest(career))} · Rain best ${bestText(personalBest(career, { rain: true }))}`);
-  lines.push(`Races run: ${career.races.length} · Training points: ${career.trainingPoints}`);
+  const stats = [
+    { icon: "stopwatch", label: "Personal best", value: bestText(personalBest(career)) },
+    { icon: "stopwatch", label: "Rain best", value: bestText(personalBest(career, { rain: true })) },
+    { icon: "medal", label: "Races run", value: String(career.races.length) },
+    { icon: "dumbbell", label: "Training points", value: String(career.trainingPoints) },
+  ];
   if (!saveWorks) lines.push({ text: "This browser isn't letting the game save, so your career will be lost when you close the page.", tone: "bad" });
 
   const buttons = [{ id: "race", label: "Race", key: "enter", primary: true }];
   if (career.trainingPoints > 0) buttons.push({ id: "train", label: `Train (${career.trainingPoints})`, key: "t" });
+  buttons.push({ id: "help", label: "How stats work", key: "s" });
   buttons.push({ id: "new", label: "New career", key: "n" });
 
-  const { button } = await screens.show({ title: "1600m", lines, buttons });
+  const { button } = await screens.show({ logo: "1600m", lines, stats, buttons });
   if (button === "race") return raceDay();
   if (button === "train") return train();
+  if (button === "help") return statsHelp();
   return confirmNewCareer();
+}
+
+// What every stat does, from the home screen.
+async function statsHelp() {
+  await screens.show({
+    title: "How stats work",
+    lines: [`Every runner has ${tuning.statPointsTotal} stat points spread over 6 stats (up to ${tuning.maxPointsPerStat} each). Training adds more.`],
+    glossary: ALL_STATS_HELP,
+    buttons: [{ id: "back", label: "Back", key: "escape", primary: true }],
+  });
+  return home();
 }
 
 async function confirmNewCareer() {
@@ -263,6 +292,9 @@ async function startRace({ seed, rng, runner, runnerIndex, condition, conditionK
   state = "running";
 }
 
+// One icon per card type (web/icons.js).
+const CARD_ICONS = { Preparation: "clipboard", Strategy: "route", Encouragement: "heart", Pacing: "stopwatch", Push: "bolt", Unique: "star" };
+
 // Pause and offer cards. moment: 0 = before the race, 1-3 = after that lap.
 async function pickCard(moment) {
   const offer = race.offerCards(moment, cardRandom(moment));
@@ -270,12 +302,31 @@ async function pickCard(moment) {
   const title = moment === 0 ? "Pick a card before the race" : `Lap ${moment} done, you're ${ordinal(race.positionOf(race.player))}. Pick a card`;
   const { choice } = await screens.show({
     title,
-    choices: offer.map((card) => ({ tag: card.type, name: `"${card.name}"`, text: [card.text], className: `type-${card.type.toLowerCase()}` })),
+    path: moment, // where you are in the race: the start, or after lap 1-3
+    choices: offer.map((card) => ({
+      tag: card.type,
+      name: `"${card.name}"`,
+      text: [card.text],
+      icon: CARD_ICONS[card.type],
+      help: helpFor(card.effects, card.multiply, card),
+      className: `type-${card.type.toLowerCase()}`,
+    })),
   });
   const card = offer[choice];
   const messages = race.pickCard(card, cardRandom(moment + 200)); // its own random numbers (e.g. "people watching" coin flip)
   hud.toast(`"${card.name}"`, "info");
   for (const message of messages) hud.toast(message, "info");
+}
+
+// The line under the results badge. The badge already says "New personal best!", so this adds the detail.
+// (The terminal version words these differently, in newBestLines.)
+function momentBestLine(result, time) {
+  const rain = result.rain ? "rain " : "";
+  if (result.overall && result.previousOverall === null) return `Your first ${rain}race on record, so it's your ${rain}best.`;
+  if (result.overall) return `${(result.previousOverall - time).toFixed(1)}s faster than your old ${rain}best, ${formatTime(result.previousOverall)}.`;
+  if (result.runner && result.previousRunner === null) return `This runner's first ${rain}race, so it's their best.`;
+  if (result.runner) return `Faster than this runner's old ${rain}best, ${formatTime(result.previousRunner)}.`;
+  return `Your ${rain}best is still ${formatTime(result.previousOverall)}.`;
 }
 
 // After the race: save it, show the results and any personal best, then offer training.
@@ -296,14 +347,32 @@ async function afterRace() {
 
   const results = race.results();
   const winner = results[0].finishTime;
-  const table = results.map((r) => ({
-    you: r.isPlayer,
-    text: `${ordinal(r.place).padEnd(4)} ${r.name.padEnd(8)} ${STYLES[r.style].name.padEnd(13)} ${formatTime(r.finishTime)}  ${r.place === 1 ? "" : `+${(r.finishTime - winner).toFixed(1)}`}${r.isRival ? "  (rival)" : ""}`,
-  }));
-  const [bestLine] = newBestLines(result, you.finishTime);
+  const table = {
+    columns: ["", "Runner", "Style", "Time", ""],
+    rows: results.map((r) => ({
+      you: r.isPlayer,
+      rival: r.isRival,
+      cells: [
+        ordinal(r.place),
+        r.isRival ? `${r.name} (rival)` : r.name, // your runner is already called "You"
+        STYLES[r.style].name,
+        formatTime(r.finishTime),
+        r.place === 1 ? "" : `+${(r.finishTime - winner).toFixed(1)}`,
+      ],
+    })),
+  };
+  const place = race.positionOf(you);
+  const bestLine = momentBestLine(result, you.finishTime);
   const { button } = await screens.show({
-    title: `You finished ${ordinal(race.positionOf(you))} in ${formatTime(you.finishTime)}`,
-    lines: [{ text: bestLine, tone: result.overall ? "gold" : result.runner ? "good" : undefined }, "You earned a training point."],
+    // The Big Moment: confetti for a win or a new personal best.
+    moment: {
+      place: ordinal(place),
+      of: results.length,
+      time: you.finishTime,
+      badge: result.overall ? "New personal best!" : result.runner ? "Runner best!" : null,
+      confetti: place === 1 || result.overall,
+    },
+    lines: [bestLine, "You earned a training point."],
     table,
     buttons: [
       { id: "train", label: "Train now", key: "t", primary: true },
@@ -336,7 +405,7 @@ async function train() {
   const offer = offerTraining(rng);
   const session = await screens.show({
     title: `Training for your ${style}`,
-    choices: offer.map((s) => ({ name: s.name, text: [s.text] })),
+    choices: offer.map((s) => ({ name: s.name, text: [s.text], icon: "dumbbell", help: helpFor(s.effects) })),
     buttons: [{ id: "back", label: "Back", key: "escape" }],
   });
   if (session.button) return train();
