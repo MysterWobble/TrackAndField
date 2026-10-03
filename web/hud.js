@@ -11,6 +11,7 @@ import { formatTime, ordinal, raceMeters } from "../src/units.js";
 import { STYLES } from "../data/styles.js";
 import { tuning } from "../data/tuning.js";
 import { ICONS, TYPE_ICONS } from "./icons.js";
+import { cardLook } from "../src/cards.js";
 
 const HOT_ICE_FUZZ = 30; // HotIce: the pace readout can be up to this many seconds off
 const LOW_STAMINA = 0.25; // below this, the ring pulses
@@ -79,6 +80,7 @@ export function createHud(root) {
     peek.innerHTML = "";
     const top = element("div", "card-top", peek);
     element("span", "card-type", top, info.chip);
+    if (info.badge) element("span", "card-badge", top, info.badge);
     if (info.icon) element("span", "card-icon", top).insertAdjacentHTML("beforeend", ICONS[info.icon]);
     element("div", "peek-name", peek, info.title);
     element("div", "peek-text", peek, info.text);
@@ -201,7 +203,7 @@ export function createHud(root) {
           title: `"${card.name}"`,
           text: card.text,
           icon: TYPE_ICONS[card.type],
-          className: `type-${card.type.toLowerCase()}`,
+          ...cardLook(card),
         })),
       ];
       tags.innerHTML = "";

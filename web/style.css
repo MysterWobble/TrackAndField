@@ -1437,3 +1437,108 @@ body {
     animation-name: fade-in;
   }
 }
+
+/* ---------- Rare cards ---------- */
+
+/* Rare cards (Unique and Rivalry) get a lavender "foil" edge with a soft shine that sweeps across now and then,
+   and a small badge. Gold stays for kicking and for the card you've picked. */
+.card.rare,
+.peek.rare {
+  border: 3px solid #b39cd0;
+  box-shadow: 0 6px 0 #8d77ad, 0 0 0 3px rgba(179, 156, 208, 0.35), 0 12px 22px rgba(18, 26, 52, 0.25);
+}
+.card.rare.picked {
+  border-color: var(--gold);
+}
+.card.rare::before,
+.peek.rare::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.55) 50%, transparent 62%);
+  background-size: 300% 100%;
+  background-position: 120% 0;
+  animation: sheen 3.6s ease-in-out infinite;
+}
+.peek.rare {
+  position: relative;
+}
+@keyframes sheen {
+  0%,
+  55% {
+    background-position: 120% 0;
+  }
+  100% {
+    background-position: -20% 0;
+  }
+}
+.card-badge {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: var(--pill);
+  background: #b39cd0;
+  box-shadow: 0 2px 0 #8d77ad;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.rivalry .card-badge {
+  background: var(--track);
+  box-shadow: 0 2px 0 #7d332d;
+  color: #fff;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card.rare::before,
+  .peek.rare::before {
+    animation: none;
+  }
+}
+
+/* The speaker button: on every screen, top right (just under your place during races). Turns all sound on or off. */
+.speaker-button {
+  position: fixed;
+  top: calc(var(--gap-top) + 96px);
+  right: var(--gap);
+  z-index: 30; /* above the menus too */
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--panel);
+  box-shadow: 0 4px 0 var(--panel-deep);
+  cursor: pointer;
+  --icon-base: var(--cream);
+  --icon-facet: var(--cream-shade);
+  --icon-line: var(--cream);
+  transition:
+    transform var(--t-fast) var(--spring),
+    box-shadow var(--t-fast) var(--spring),
+    opacity var(--t-fast) var(--ease-out);
+}
+.speaker-button .icon {
+  width: 26px;
+  height: 26px;
+  filter: none;
+}
+.speaker-button:active {
+  transform: translateY(3px) scale(0.94);
+  box-shadow: 0 1px 0 var(--panel-deep);
+}
+.speaker-button.off {
+  opacity: 0.75;
+}
+@media (max-height: 500px) {
+  .speaker-button {
+    top: calc(var(--gap-top) + 84px);
+    width: 38px;
+    height: 38px;
+  }
+}

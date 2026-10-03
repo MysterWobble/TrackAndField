@@ -9,6 +9,7 @@
 import { tuning } from "../data/tuning.js";
 import { formatTime } from "../src/units.js";
 import { ICONS } from "./icons.js";
+import { confirm, tick } from "./sound.js";
 
 function element(tag, className, parent, text) {
   const el = document.createElement(tag);
@@ -45,7 +46,7 @@ export function createScreens(root) {
   //   path     laps done so far, to show the run path strip (card picks)
   //   table    { columns: [names], rows: [{ cells: [values], you, rival }] }
   //   moment   the results card: { place, of, time, badge, confetti }
-  //   choices  cards: { tag, name, text: [lines], icon (a key of ICONS), className, help: [{ name, text }] }
+  //   choices  cards: { tag, name, text: [lines], icon (a key of ICONS), className, badge, help: [{ name, text }] }
   //            (help adds a ? button that opens an explanation bubble over the card)
   //   buttons  { id, label, key, primary }
   function show({ logo = null, title, lines = [], stats = [], glossary = [], path = null, table = null, choices = [], buttons = [], moment = null }) {
@@ -86,6 +87,7 @@ export function createScreens(root) {
       if (table) resultsTable(box, table);
 
       const done = (value) => {
+        if (value.choice !== undefined) confirm(); // a little chime when a pick is confirmed
         window.removeEventListener("keydown", onKey);
         overlay.classList.add("hidden");
         resolve(value);
@@ -96,6 +98,7 @@ export function createScreens(root) {
       let cards = [];
       let continueButton = null;
       const select = (index) => {
+        if (index !== selected) tick();
         selected = index;
         cards.forEach((card, i) => {
           card.classList.toggle("picked", i === index);
@@ -115,6 +118,7 @@ export function createScreens(root) {
           card.setAttribute("aria-pressed", "false");
           const top = element("div", "card-top", card);
           element("span", choice.tag ? "card-type" : "", top, choice.tag ?? "");
+          if (choice.badge) element("span", "card-badge", top, choice.badge); // RARE or RIVALRY
           if (choice.help?.length) helpBubble(card, top, choice.help);
           element("span", "card-key", top, String(i + 1)); // painted like a lane number
           if (choice.icon) element("div", "card-icon", card).insertAdjacentHTML("beforeend", ICONS[choice.icon]);

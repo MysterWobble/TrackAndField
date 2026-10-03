@@ -16,6 +16,7 @@ All values below are **starting points**. Tune them by putting a render next to 
 - Runners are **≤ ~3k triangles** each. No real-time shadows. No post-processing by default.
 - No detailed textures. The only image allowed is a single palette swatch image (a Kenney `colormap.png`) when a kit uses one.
 - **No AI-generated art.** Use original art or credited CC0 kits (Quaternius, Kenney) only, and log each one in `CREDITS.md`.
+  - **Exception (designers' decision, 2026-10-02): music.** The music tracks were made by the designers in Suno, on a paid plan that grants commercial use. AI-made music is allowed; visuals stay original.
 - The UI must read at **844 × 390** landscape.
 
 ## 2. Rules
@@ -206,6 +207,10 @@ gltf.scene.traverse((o) => {
   - **Sparks** become a handful of soft warm motes: short-lived additive sprites or `Points`.
   - **Speed lines** in `cream` at low opacity.
   - **Edge glow** is a soft gold vignette in CSS over the canvas, which costs nothing.
+- **Sound (v0.4):** soft and few, made in code (`web/sound.js`).
+  - A starting gun. (A crowd murmur made from noise was tried and removed: it sounded like static.)
+  - A last-lap bell, a whoosh when you kick, soft ticks for card picks, and a short fanfare for a win or a personal best.
+  - Mute with M or the home-screen button.
 - **The second exception is the Big Moment** (UI_DIRECTION.md §8): when you win or set a new personal best, about 26 paper confetti pieces in `cream`, `gold`, the school red and lavender flutter down once over the results card (about 1.2 s, DOM/CSS only, nothing in the 3D scene). No confetti when the device asks for reduced motion.
 
 ## 10. UI (HTML/CSS)

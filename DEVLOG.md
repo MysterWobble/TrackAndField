@@ -306,7 +306,40 @@ Short entries, every session. This becomes the portfolio and essay material.
 
 **Card peek (designer ask):** tap any tag in the lower left of the race display (your cards, today's conditions, or your running style) and a small card pops up above the tags with its full text. Tap it, tap the tag again, or tap anywhere to close. A tap on the track that closes it doesn't also start a kick. The card-type icons moved to `web/icons.js` (`TYPE_ICONS`) so the card picks and the race display share them.
 
-**Next:** the designers try the race camera in a full race. Then: rarity colors and sounds (step 6), or deploy (step 8). A player picking cards at random wins about 10% (average 4th). Computer runners use the same cards, so the Speed nerf hits them too. Stacked Determination builds that kick all race win 1–4%, so the buff doesn't bring back the old exploit.
+**Next:** the designers try the race camera in a full race.
+
+## 2026-10-02 (later): Finishing step 6: rare cards and sounds
+**Rare cards:**
+- Unique and Rivalry cards (the ones that show up a third as often) get a lavender "foil" edge with a soft shine that sweeps across every few seconds.
+- They also get a badge: **RARE** in lavender, or **RIVALRY** in school red.
+- The same look shows in the race display's card peek. `cardLook()` in `src/cards.js` decides it, so the card picks and the peek always match. Gold stays for kicking and for the card you've picked.
+
+**Sounds,** made in code with Web Audio (no files, nothing to license), soft to match the calm look (`web/sound.js`):
+- a starting gun as the race begins, and a crowd murmur that builds on the last lap and cheers at the finish;
+- a last-lap bell (like a real meet);
+- a whoosh when your kick starts;
+- a soft tick when you select a card and a two-note chime when you confirm;
+- a short rising fanfare for a win or a personal best.
+
+Browsers only allow sound after a tap, so audio starts on the first tap. Mute with M anywhere, or the "Sound" button on the home screen (remembered in this browser).
+
+**Checked:** every sound plays without errors once a tap unlocks audio, and mute toggles. The designers should listen and say what's too loud, too quiet, or annoying.
+
+**Step 6 is done** (card UI, rare cards, a personal-best celebration, simple sound).
+
+**Music decision (designers):** the designers made two tracks in Suno: a base track for menus and racing, and a more intense version for the last lap. AI-made music is allowed (the "no AI-generated art" rule stays for visuals). They're on a paid Suno plan, which grants commercial use, so the tracks can ship in the public game. Credited in CREDITS.md.
+
+**Music added** (`public/music/`, played by `web/sound.js`):
+- The base track (`MainRaceMusic.mp3`, 3:42) loops in the menus and the race. The intense version (`SlightlyMoreIntenseRaceMusic.mp3`, 4:03) takes over for the last lap with a 2.5-second crossfade, and fades back for the menus.
+- Both start on the first tap and loop together (the intense one silent until needed), which phones need in order to play it later without another tap.
+- When switching, the incoming track jumps to the same point in the song. The tracks are different lengths, so if the switch sounds off musically, the alternative is starting the intense one from its beginning.
+- Home screen: "Music: on/off" (music only); M still mutes everything. Both are remembered.
+- **Speaker button (designer ask):** a round speaker button in the top-right corner on every screen (menus and races, just under your place). It turns all sound on or off, the same as M, showing sound waves or an X. It replaced the home screen's "Sound" button.
+- **Fixed (playtest):** the music stayed on the intense track after a race, so after "Race again" there was nothing to switch to on lap 4. Every race now starts on the base track.
+- **Removed the crowd murmur and finish cheer** (playtest: "white noise through the speaker"). Made from filtered noise, they sounded like static; the music carries the mood instead.
+- **Sound pauses when the game is out of sight** (another tab or app, or a locked phone) and picks up when you come back.
+- **Fixed:** the speaker and camera buttons kept keyboard focus after a tap, so pressing Enter or Space (kick) afterwards pressed them again. They now let go of focus.
+- **Size:** about 5 MB per track, fine on Wi-Fi. When we deploy, consider trimming them to a shorter loop or a lower bitrate so phones on mobile data load faster (there's no audio tool on this computer to do it now). Then: rarity colors and sounds (step 6), or deploy (step 8). A player picking cards at random wins about 10% (average 4th). Computer runners use the same cards, so the Speed nerf hits them too. Stacked Determination builds that kick all race win 1–4%, so the buff doesn't bring back the old exploit.
 
 ---
 

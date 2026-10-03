@@ -38,6 +38,16 @@ export const ICONS = {
     <circle cx="12" cy="13.5" r="4.2" ${base}/>
     <circle cx="12" cy="13.5" r="2" ${facet}/>`),
 
+  // A speaker with sound waves (sound on), and with an X (sound off).
+  speaker: svg(`
+    <path d="M3 9 H7 L12.5 4.5 V19.5 L7 15 H3 Z" ${base}/>
+    <path d="M3 9 H7 V15 H3 Z" ${facet}/>
+    <path d="M15.5 9 Q17.5 12 15.5 15 M18.5 6.5 Q22 12 18.5 17.5" ${line}/>`),
+  speakerOff: svg(`
+    <path d="M3 9 H7 L12.5 4.5 V19.5 L7 15 H3 Z" ${base}/>
+    <path d="M3 9 H7 V15 H3 Z" ${facet}/>
+    <path d="M15.5 9 L21 15 M21 9 L15.5 15" ${line}/>`),
+
   // Card types (one icon each), and training.
   // Preparation: a clipboard checklist.
   clipboard: svg(`

@@ -25,6 +25,7 @@ import {
   runnerFromCareer,
   trainingRandom,
 } from "../src/careerCore.js";
+import { cardLook } from "../src/cards.js";
 import { CONDITIONS, CONDITION_KEYS } from "../data/conditions.js";
 import { STYLES } from "../data/styles.js";
 import { tuning } from "../data/tuning.js";
@@ -35,7 +36,8 @@ import { buildCampus, hillTFitPoints } from "./campus.js";
 import { createRunnerViews } from "./runners.js";
 import { createKickTrail } from "./effects.js";
 import { createHud, messageFor } from "./hud.js";
-import { TYPE_ICONS } from "./icons.js";
+import { ICONS, TYPE_ICONS } from "./icons.js";
+import * as sound from "./sound.js";
 import { createScreens } from "./screens.js";
 import { backupCareer, loadCareer, saveCareer } from "./storage.js";
 
@@ -212,12 +214,30 @@ function moveCamera(dt) {
 // Menus get the wide view; races get the race view.
 function showRace(on) {
   hud.setVisible(on);
+  if (!on) sound.musicIntensity(false); // back to the base track in the menus
   wideWanted = !on;
 }
 window.addEventListener("resize", fitCamera);
 fitCamera();
 
 const hud = createHud(document.getElementById("hud"));
+
+// The speaker button, top right on every screen: turns all sound on or off (same as the M key).
+const speakerButton = document.createElement("button");
+speakerButton.className = "speaker-button";
+document.body.appendChild(speakerButton);
+function showSpeaker(muted) {
+  speakerButton.innerHTML = muted ? ICONS.speakerOff : ICONS.speaker;
+  speakerButton.classList.toggle("off", muted);
+  speakerButton.setAttribute("aria-label", muted ? "Sound is off: turn it on (M)" : "Sound is on: turn it off (M)");
+  speakerButton.title = muted ? "Sound off (M)" : "Sound on (M)";
+}
+speakerButton.addEventListener("click", () => {
+  sound.toggleMute();
+  speakerButton.blur(); // so Enter (start a race) or Space (kick) doesn't press it again
+});
+sound.onMuteChange(showSpeaker);
+showSpeaker(sound.isMuted());
 const screens = createScreens(document.getElementById("screens"));
 const trail = createKickTrail(scene);
 const runnerLayer = new THREE.Group();
@@ -287,12 +307,17 @@ async function home() {
   const buttons = [{ id: "race", label: "Race", key: "enter", primary: true }];
   if (career.trainingPoints > 0) buttons.push({ id: "train", label: `Train (${career.trainingPoints})`, key: "t" });
   buttons.push({ id: "help", label: "How stats work", key: "s" });
+  buttons.push({ id: "music", label: sound.isMusicOn() ? "Music: on" : "Music: off" });
   buttons.push({ id: "new", label: "New career", key: "n" });
 
   const { button } = await screens.show({ logo: "1600m", lines, stats, buttons });
   if (button === "race") return raceDay();
   if (button === "train") return train();
   if (button === "help") return statsHelp();
+  if (button === "music") {
+    sound.toggleMusic();
+    return home();
+  }
   return confirmNewCareer();
 }
 
@@ -362,6 +387,7 @@ async function startRace({ seed, rng, runner, runnerIndex, condition, conditionK
   cardRandom = (moment) => createRandom(seed * 1000 + moment + 7);
   runnerLayer.clear();
   runnerViews = createRunnerViews(race, runnerLayer);
+  sound.musicIntensity(false); // every race starts on the base track ("Race again" skips the menus)
   followRunner = runnerViews.you; // the race camera follows your runner
   shoulderPlaced = false; // ...starting right behind them, not gliding in from the last race
   lapsOffered = 0;
@@ -372,6 +398,7 @@ async function startRace({ seed, rng, runner, runnerIndex, condition, conditionK
   state = "picking";
   await pickCard(0);
   state = "running";
+  sound.startGun();
 }
 
 
@@ -389,7 +416,7 @@ async function pickCard(moment) {
       text: [card.text],
       icon: TYPE_ICONS[card.type],
       help: helpFor(card.effects, card.multiply, card),
-      className: `type-${card.type.toLowerCase()}`,
+      ...cardLook(card), // type color, plus the foil look and a badge for rare cards
     })),
   });
   const card = offer[choice];
@@ -442,6 +469,8 @@ async function afterRace() {
     })),
   };
   const place = race.positionOf(you);
+  const celebrate = place === 1 || result.overall; // confetti and a fanfare
+  if (celebrate) sound.fanfare();
   const bestLine = momentBestLine(result, you.finishTime);
   const { button } = await screens.show({
     // The Big Moment: confetti for a win or a new personal best.
@@ -450,7 +479,7 @@ async function afterRace() {
       of: results.length,
       time: you.finishTime,
       badge: result.overall ? "New personal best!" : result.runner ? "Runner best!" : null,
-      confetti: place === 1 || result.overall,
+      confetti: celebrate,
     },
     lines: [bestLine, "You earned a training point."],
     table,
@@ -512,13 +541,18 @@ async function train() {
 function setKick(on) {
   if (!race) return;
   const you = race.player;
+  const wasKicking = you.kicking;
   you.kicking = on && state === "running" && you.stamina > 0 && you.finishTime === null;
+  if (you.kicking && !wasKicking) sound.kickWhoosh();
 }
 window.addEventListener("keydown", (event) => {
   if ((event.code === "Space" || event.code === "KeyK") && !event.repeat) setKick(true);
   if (event.code === "KeyC" && !event.repeat && race) toggleRaceCamera();
 });
-hud.cameraButton.addEventListener("click", toggleRaceCamera);
+hud.cameraButton.addEventListener("click", () => {
+  toggleRaceCamera();
+  hud.cameraButton.blur(); // so Space (kick) doesn't switch the camera again
+});
 hud.cameraButton.classList.toggle("on", shoulderWanted); // the remembered choice
 window.addEventListener("keyup", (event) => {
   if (event.code === "Space" || event.code === "KeyK") setKick(false);
@@ -555,6 +589,10 @@ function frame(now) {
     if (race.player.laps.length > lapsOffered) {
       lapsOffered = race.player.laps.length;
       tickBank = 0;
+      if (lapsOffered === tuning.laps - 1) {
+        sound.lastLapBell();
+        sound.musicIntensity(true); // the intense version for the last lap
+      }
       if (lapsOffered < tuning.laps) {
         setKick(false);
         state = "picking";
