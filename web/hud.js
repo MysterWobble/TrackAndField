@@ -1,5 +1,5 @@
 // The race display drawn over the 3D view: lap, time, position, stamina, splits, the kick button,
-// pop-up messages, the kick "nitro" glow, and the card-pick and results screens.
+// pop-up messages, and the kick "nitro" glow. (Menus and card picks are in screens.js.)
 // Plain for now; step 6 makes it look good.
 
 import { formatTime, ordinal, raceMeters } from "../src/units.js";
@@ -30,7 +30,6 @@ export function createHud(root) {
   const splits = element("div", "splits", bottom);
   const kickButton = element("button", "kick-button", root, "HOLD\nTO KICK");
   const messages = element("div", "messages", root);
-  const overlay = element("div", "overlay hidden", root);
 
   let paceFuzz = 0; // HotIce: how far off the pace readout is this lap
   let fuzzLap = -1;
@@ -85,59 +84,13 @@ export function createHud(root) {
     setTimeout(() => note.remove(), 3200);
   }
 
-  // Shows up to 3 cards and waits for a pick (click/tap, or keys 1-3). Resolves with the chosen card's index.
-  function showCards(offer, heading) {
-    overlay.innerHTML = "";
-    overlay.classList.remove("hidden");
-    element("h2", null, overlay, heading);
-    const row = element("div", "cards", overlay);
-    return new Promise((resolve) => {
-      const choose = (index) => {
-        window.removeEventListener("keydown", onKey);
-        overlay.classList.add("hidden");
-        resolve(index);
-      };
-      const onKey = (event) => {
-        const index = Number(event.key) - 1;
-        if (index >= 0 && index < offer.length) choose(index);
-      };
-      window.addEventListener("keydown", onKey);
-      offer.forEach((card, i) => {
-        const button = element("button", `card type-${card.type.toLowerCase()}`, row);
-        element("div", "card-key", button, String(i + 1));
-        element("div", "card-type", button, card.type);
-        element("div", "card-name", button, `"${card.name}"`);
-        element("div", "card-text", button, card.text);
-        button.addEventListener("click", () => choose(i));
-      });
-    });
+  // Hide the race display while the menus are up.
+  function setVisible(on) {
+    root.classList.toggle("off", !on);
+    if (!on) messages.innerHTML = "";
   }
 
-  // Final results, with a button to race again.
-  function showResults(race, onAgain) {
-    overlay.innerHTML = "";
-    overlay.classList.remove("hidden");
-    const you = race.player;
-    element("h2", null, overlay, `You finished ${ordinal(race.positionOf(you))} in ${formatTime(you.finishTime)}`);
-    const table = element("div", "results", overlay);
-    const winner = race.results()[0].finishTime;
-    for (const r of race.results()) {
-      const line = element("div", r.isPlayer ? "result you" : "result", table);
-      const gap = r.place === 1 ? "" : `+${(r.finishTime - winner).toFixed(1)}`;
-      line.textContent = `${ordinal(r.place).padEnd(4)} ${r.name.padEnd(8)} ${STYLES[r.style].name.padEnd(13)} ${formatTime(r.finishTime)}  ${gap}${r.isRival ? "  (rival)" : ""}`;
-    }
-    const again = element("button", "again", overlay, "Race again (R)");
-    const go = () => {
-      window.removeEventListener("keydown", onKey);
-      overlay.classList.add("hidden");
-      onAgain();
-    };
-    const onKey = (event) => event.code === "KeyR" && go();
-    window.addEventListener("keydown", onKey);
-    again.addEventListener("click", go);
-  }
-
-  return { update, toast, showCards, showResults, kickButton };
+  return { update, toast, setVisible, kickButton };
 }
 
 // Turns a race event into a pop-up message about YOU (or null if it isn't worth showing).

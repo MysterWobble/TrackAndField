@@ -199,7 +199,65 @@ body {
   opacity: 0;
 }
 
-/* ---------- Card picks and results (plain for now; step 6 makes them pretty) ---------- */
+#hud.off {
+  display: none;
+}
+
+/* ---------- Menus, card picks, and results (plain for now; step 6 makes them pretty) ---------- */
+
+#screens {
+  position: fixed;
+  inset: 0;
+  pointer-events: none; /* only the menu itself (when showing) takes taps */
+}
+
+.note {
+  max-width: min(640px, 90vw);
+  padding: 2px 14px;
+  border-radius: 10px;
+  background: rgba(247, 244, 234, 0.92);
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+}
+.note.good {
+  border: 3px solid var(--you-green);
+  font-weight: 800;
+}
+.note.gold {
+  border: 3px solid var(--gold);
+  font-weight: 800;
+}
+.note.bad {
+  border: 3px solid var(--track-red);
+}
+
+.buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.button {
+  padding: 8px 20px;
+  border: 4px solid var(--navy);
+  border-radius: 14px;
+  background: var(--lane-white);
+  color: var(--navy);
+  font: 800 17px "Baloo 2", system-ui, sans-serif;
+  cursor: pointer;
+}
+.button.primary {
+  background: var(--you-green);
+}
+.button:hover {
+  transform: translateY(-2px);
+}
+
+.overlay {
+  overflow-y: auto;
+  justify-content: safe center; /* on short phone screens, tall menus scroll instead of getting cut off */
+}
 
 .overlay {
   position: absolute;

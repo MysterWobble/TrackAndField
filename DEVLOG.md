@@ -130,6 +130,17 @@ Short entries, every session. This becomes the portfolio and essay material.
 **Card fix (designers):** "Team Pep-Talk" was building up (+10, +20, +30, +40 Determination). It should be +10 on every lap without building up, so it's now a flat +10 Determination.
 **Next:** part 3, menus for conditions, runner choice and training, plus saving in the browser.
 
+## 2026-09-28: PLAN step 5, part 3, career in the browser
+**Built:**
+- **Home screen:** personal best, rain best, races run, training points, and Race / Train / New career buttons. The first visit creates your 3 runners with a welcome message.
+- **Race day:** today's conditions, then pick 1 of your 3 runners (stats, paces, style, and each runner's best), then the pre-race card.
+- **After the race:** results, whether you set a personal best (overall, per runner, or rain), and your training point, with Train now / Race again / Home.
+- **Training:** pick any runner, then 1 of 3 sessions, with the same 15% Determination bonus chance. Points can be saved for later.
+- **Saving:** the career is saved in the browser (local storage), separate from the terminal save file. New career keeps the old one as a backup. If the browser blocks saving, the home screen says so.
+- **Shared rules:** the career rules moved into `src/careerCore.js`, used by both the terminal and the browser, so they can't drift apart.
+- **Testing tip:** add `?speed=10` to the address to run races 10x faster.
+**Next:** part 4, real runner models (with the cozy look, once reference images arrive).
+
 ---
 
 ## Milestones
