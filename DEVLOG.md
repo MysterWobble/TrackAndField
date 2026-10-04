@@ -327,6 +327,14 @@ Browsers only allow sound after a tap, so audio starts on the first tap. Mute wi
 
 **Step 6 is done** (card UI, rare cards, a personal-best celebration, simple sound).
 
+## 2026-10-03: Going online (PLAN step 8)
+**Decision (designers):** host on **GitHub Pages** instead of Vercel. No new account, and it's set up entirely from GitHub. The trade-offs we accepted: a longer link, and no per-change preview links (Vercel's main advantage).
+- **Live at https://mysterwobble.github.io/TrackAndField/**
+- `.github/workflows/deploy.yml`: every push to main installs, runs the tests (nothing goes live if they fail), builds, and publishes.
+- `vite.config.js`: the built game lives under `/TrackAndField/`; the dev server still serves from `/`, so the home-Wi-Fi link keeps working. The music paths now use Vite's `BASE_URL`, so they work in both places.
+- Checked the built version locally under `/TrackAndField/` (home, race, music loading) before publishing.
+- **Sharing notes:** saves stay in each person's browser (no shared leaderboard until step 7). The first load is slower on mobile data because of the two 5 MB music tracks.
+
 **Music decision (designers):** the designers made two tracks in Suno: a base track for menus and racing, and a more intense version for the last lap. AI-made music is allowed (the "no AI-generated art" rule stays for visuals). They're on a paid Suno plan, which grants commercial use, so the tracks can ship in the public game. Credited in CREDITS.md.
 
 **Music added** (`public/music/`, played by `web/sound.js`):

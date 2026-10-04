@@ -156,7 +156,11 @@ export function fanfare() {
 // about playing it later). Switching lines the incoming track up with the outgoing one (they're versions
 // of the same song) and crossfades.
 
-const TRACKS = { base: "/music/MainRaceMusic.mp3", intense: "/music/SlightlyMoreIntenseRaceMusic.mp3" };
+// BASE_URL is "/" on the dev server and "/TrackAndField/" on the live site (vite.config.js).
+const TRACKS = {
+  base: `${import.meta.env.BASE_URL}music/MainRaceMusic.mp3`,
+  intense: `${import.meta.env.BASE_URL}music/SlightlyMoreIntenseRaceMusic.mp3`,
+};
 const MUSIC_LEVEL = 0.55; // music volume, under the overall volume
 const CROSSFADE_SECONDS = 2.5;
 const MUSIC_KEY = "1600m.music";
