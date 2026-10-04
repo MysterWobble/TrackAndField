@@ -33,7 +33,7 @@ Starter set. Rename or cut.
 - **Top Speed**: The highest speed at which a certain runner can run  
 - **Stamina:** A resource that depletes at a rate according to speed, (how long you can run, depending on your speed)  
 - **Kick:** The rate at which you speed up (Ex: 5MPH/1Sec)  
-- **Determination:** The chance to gain bonus stamina when reaching low stamina  
+- **Determination:** The chance to gain bonus stamina when reaching low stamina (one roll per lap, the first time you're low that lap)  
 - **Race IQ:** better positioning and strategy (Ex. Less time a runner spends boxed in, better consistent pace for the whole race, less time runners spend running on an outside lane.  
 - **Starting 1600 time for a new runner:** 7:00 *(suggested: around 6:00)*
 
@@ -52,7 +52,7 @@ Used by you and CPU runners. Each CPU runner gets a style and a name.
 
 ## 6\. Choices (The Heart of the Game)
 
-Each pick is 1 of 3 cards. Cards have a **rarity** (common / rare / epic) and a **tradeoff** where possible. Cards are picked After each lap, or at the start of the race (Cards at the start of a race have a much greater effect)
+Each pick is 1 of 3 cards. Cards have a **rarity** (common / rare / epic) and a **tradeoff** where possible. Cards are picked After each lap, or at the start of the race (Cards at the start of a race have a much greater effect). Computer runners pick cards at the same moments (a random card with no special rules), so the field plays by the same rules as you.
 
 | When | Card type | Card Effects |
 | :---- | :---- | :---- |
@@ -105,12 +105,15 @@ Fixes the PB plateau: training permanently raises your baseline.
 
 ## 9\. Look and Feel
 
-- **Style:** low-poly 3D stadium, fixed angled camera over the track  
-- **Palette (5–6 hex colors):** track red #C8553D · infield green #5FA04E · sky blue #8EC9F0 · lane white #F7F4EA · you green #2EE66B (your runner: the "this is me" color) · gold #F2B33D (highlights, kicking, personal bests) · navy #1F2A44 (text). *Cozy vibe planned for the real assets; reference images coming.*  
+**The full look is defined in [docs/STYLE_GUIDE.md](docs/STYLE_GUIDE.md), the single source of truth.** The lines below are a summary.
+
+- **Style:** cozy low-poly, on a late afternoon: the stadium of the designers' real high school, seen from the sky, with the campus and hills around it. A fixed, steep camera frames the track during races and pulls back for the menus.  
+- **Palette:** the school's colors: red track #C8544A, green turf #6C9E47, navy #2C3E73, cream lines #F2EBDA, warm haze #EADFC6. **You green #34B98A** is the only saturated color (your runner only). Gold #E8B84B means highlights and kicking. Full palette in the style guide.  
+- **School name:** "TIGERS" and the big T are shown, never the school's own name.  
 - **Typeface:** Baloo 2 (Google Fonts, rounded and bold)  
-- **Mood in three words:** bright, energetic, friendly (a sunny school meet)  
-- **Reference images:** *attach 2–3*  
-- **Do NOT want:**  
+- **Mood in three words:** soft, chunky, calm  
+- **Reference images:** Whistlevale (whistlevale.com) for the feel; screenshots go in [docs/style-refs/](docs/style-refs/)  
+- **Do NOT want:** detailed textures, neon or fully saturated colors (except You green), pure white or black, black outlines, glossy materials, real-time shadows, bloom, cluttered set dressing  
 - **Theme:** a normal 400 m oval track for v1. Zombie version maybe later (same mechanics, new models and card names).
 
 ## 10\. Screens for Version 1

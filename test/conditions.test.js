@@ -7,9 +7,21 @@ import { addBonuses, buildRunner, withBonuses } from "../src/runner.js";
 import { createRace } from "../src/race.js";
 import { makeField, makeYourRunners } from "../src/field.js";
 import { CONDITIONS } from "../data/conditions.js";
+import { tuning } from "../data/tuning.js";
 
 const stats = { speed: 25, topSpeed: 25, stamina: 25, kick: 25, determination: 30, raceIQ: 20 };
 const close = (a, b) => Math.abs(a - b) < 1e-9;
+
+// Some checks compare exact stats or speeds, so computer runners' random cards are switched off for them.
+function withoutComputerCards(check) {
+  const before = tuning.computerRunnersGetCards;
+  tuning.computerRunnersGetCards = false;
+  try {
+    check();
+  } finally {
+    tuning.computerRunnersGetCards = before;
+  }
+}
 
 function soloRace(runner, condition) {
   const race = createRace(runner, [], createRandom(1), undefined, condition);
@@ -52,11 +64,13 @@ test("Fast Track: Kick +5%, and it adds to the Pacer's -25% (making -20%)", () =
 });
 
 test("Rivalry Race: everyone gets +10% Determination and one computer runner is your rival", () => {
-  const rivals = [buildRunner("Maya", stats), buildRunner("Leo", stats)];
-  const race = createRace(buildRunner("You", stats), rivals, createRandom(1), undefined, CONDITIONS.rivalry);
-  for (const e of race.entrants) assert.ok(close(e.runner.determination, 33));
-  assert.ok(race.rival && !race.rival.isPlayer);
-  assert.equal(createRace(buildRunner("You", stats), rivals, createRandom(1)).rival, null, "no rival in a normal race");
+  withoutComputerCards(() => {
+    const rivals = [buildRunner("Maya", stats), buildRunner("Leo", stats)];
+    const race = createRace(buildRunner("You", stats), rivals, createRandom(1), undefined, CONDITIONS.rivalry);
+    for (const e of race.entrants) assert.ok(close(e.runner.determination, 33));
+    assert.ok(race.rival && !race.rival.isPlayer);
+    assert.equal(createRace(buildRunner("You", stats), rivals, createRandom(1)).rival, null, "no rival in a normal race");
+  });
 });
 
 test("Rainy: speed and top speed drop 5% (not 10%), Race IQ goes up 5%", () => {
@@ -86,18 +100,20 @@ test("Fast Track: top speed is 5% higher too", () => {
 });
 
 test("Windy: tucking in behind someone shelters you from the headwind, without passing them", () => {
-  // Perfect Race IQ, so pace wobble doesn't blur the comparison.
-  const leader = buildRunner("Leader", { ...stats, raceIQ: 50 });
-  const follower = buildRunner("You", { ...stats, speed: 20, raceIQ: 50 }); // a bit slower than the leader
-  const race = createRace(follower, [leader], createRandom(1), undefined, CONDITIONS.windy);
-  race.entrants[1].distance = 2; // the leader starts 2 m ahead, so you're tucked in
-  const alone = createRace(follower, [], createRandom(1), undefined, CONDITIONS.windy);
-  while (race.player.distance < 380) {
-    race.step();
-    alone.step();
-    assert.ok(race.player.distance < race.entrants[1].distance, "shelter should never carry you past the leader");
-  }
-  assert.ok(race.player.speed > alone.player.speed, "sheltered should be faster than facing the headwind alone");
+  withoutComputerCards(() => {
+    // Perfect Race IQ, so pace wobble doesn't blur the comparison.
+    const leader = buildRunner("Leader", { ...stats, raceIQ: 50 });
+    const follower = buildRunner("You", { ...stats, speed: 20, raceIQ: 50 }); // a bit slower than the leader
+    const race = createRace(follower, [leader], createRandom(1), undefined, CONDITIONS.windy);
+    race.entrants[1].distance = 2; // the leader starts 2 m ahead, so you're tucked in
+    const alone = createRace(follower, [], createRandom(1), undefined, CONDITIONS.windy);
+    while (race.player.distance < 380) {
+      race.step();
+      alone.step();
+      assert.ok(race.player.distance < race.entrants[1].distance, "shelter should never carry you past the leader");
+    }
+    assert.ok(race.player.speed > alone.player.speed, "sheltered should be faster than facing the headwind alone");
+  });
 });
 
 test("Rain is marked for its own personal best", () => {

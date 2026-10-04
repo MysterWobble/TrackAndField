@@ -141,6 +141,214 @@ Short entries, every session. This becomes the portfolio and essay material.
 - **Testing tip:** add `?speed=10` to the address to run races 10x faster.
 **Next:** part 4, real runner models (with the cozy look, once reference images arrive).
 
+## 2026-10-01: Art style guide, and the cozy look (step 5, part 4a)
+**Decisions made (and why):**
+- **Art style guide v0.2** (`docs/STYLE_GUIDE.md`), written by the designers with Whistlevale as the feel reference: "a warm, hand-built tabletop model of a track meet on a late afternoon." It's now the single source of truth for the look; SPEC section 9 points to it. Decided: a diorama base (yes), a terracotta track, evening mode later, tilt-shift blur only after the phone test.
+- Added `docs/style-refs/` for reference screenshots and `CREDITS.md` for every outside asset, font, and library.
+**Built (all in code, no downloads):**
+- The guide's warm palette (`web/colors.js`), with one shared matte material per color (`web/materials.js`). Your runner's material is its own copy, so only you glow when kicking.
+- Warm side lighting (one sun about 45° up, a warm sky light), neutral tone mapping, warm haze, and a CSS backdrop behind a transparent canvas.
+- **A floating diorama slab:** sandy top, 4 terraced earth bands, an oak rim. It reaches further on the far side than the near side. The camera now measures the slab's outline and backs off until all of it fits on any screen.
+- **The main stand moved to the far side, facing the camera:** from the near side you only saw its roof. Cream steps, oak benches, a brass rail, a green roof on posts, and a crowd of capsules with ball heads that bob gently out of sync (2 draw calls).
+- Chunky trees (canopy lumps on trunks) in calm zones, pines along the back edge.
+- Runners in the guide's kit colors with darker shorts, warm blob shadows nudged away from the sun, and a You-green ring under your runner.
+- **Kick restyle:** your runner's gold glow, a few warm glowing motes instead of box sparks, a soft gold edge vignette, faint cream speed lines.
+- **UI:** dark green panels with cream text, cream cards with ink text, gold pill buttons, the guide's type sizes, touch targets of at least 44px. On short (phone) screens the menus tighten so 3 cards fit without scrolling. At most 2 pop-up messages show at once, with no repeats within 3 seconds.
+**Still to check:** draw calls and frame rate on a real phone (rough count: about 80 draw calls, under the guide's 100). Static scenery could be merged further if needed.
+**Next:** the Quaternius runner models (part 4b), then the phone test.
+
+## 2026-10-01 (later): The real high school, from the air
+**Designer asks:** a more colorful, detailed track; UI that matches its colors (with a new `docs/UI_DIRECTION.md` inspired by Yoshi's Crafted World); and the track set in the stepson's actual high school instead of floating in space, seen from the sky.
+**Decisions made (and why):**
+- **Match the real school**, from aerial photos: red track, green turf, navy end zones, white field border, gray walkway. These replace the terracotta track (style guide v0.3). Navy and green track options were previewed first: a green track hid your green runner, and a navy one hid the navy and charcoal kits.
+- **No floating slab.** The campus runs past the screen edges into hazy chaparral hills, like a view from the sky. (Style guide §8 updated.)
+- **No school name, mascot, or logo for now**, because the repo and game are public and it would tie the game to where a student goes to school. The end zones, press box and scoreboard stay plain until the designers decide.
+**Built (all low-poly, in code):** the stadium (lane lines, exchange-zone marks, the 1600 m start arc, the football field with stripes, yard lines and numbers, navy end zones and team areas, goal posts, long jump runways and sand pits, a shot put circle), home bleachers with the press box (north), visitor bleachers (south), light poles, a scoreboard (east). The campus in `web/campus.js`: portables, the main buildings with roof units, the pool, 8 tennis courts, parking lots with cars, the road down the east side, baseball and softball diamonds, palms, scrub, and hills. The camera frames the whole stadium plus the front of the school.
+**Trade-off noticed:** showing the campus makes the runners a bit smaller than before. Still readable at phone size; check on a real phone in part 5.
+**Next:** the UI direction (layered paper panels, outlined numbers, run-path strip, select-then-Continue cards, Big Moment results, springy motion) in the school's colors, then the runner models.
+
+## 2026-10-01 (evening): Tigers, the big T, and the real campus layout
+**Designer asks:** show a team name and the big T (leave the school's own name out); put the big T on the hill like the real one; make the campus closer to the real school. The designers sent Google Maps screenshots (top-down and tilted).
+**Decisions made (and why):**
+- **"TIGERS" everywhere the real school shows its name**: both end zones, the press box ("TIGERS FOOTBALL"), the scoreboard, and the building facing the stadium. The big T at midfield and on the hill. We first used the real team name, then switched to a made-up one that starts with T, so the big T still fits. Neither the school's name nor its real team name appears anywhere. Tigers is one of the most common team names, so it doesn't point to any one school.
+- **Lettering is drawn from shapes** (`web/lettering.js`), not a font: chunky, low-poly, and original, with no font license to track.
+- **Two camera views.** The hill T is northwest of the stadium, outside the race view. Zooming the race camera out would shrink the runners, so the menus get a wider view (campus and hill T) and the camera glides in when the race starts. The race view is now slightly closer than before, so the runners are a little bigger.
+- **Campus laid out from the screenshots** (style guide §8 lists what's where). The hill T is about four times its real size so it reads from the air.
+- **The 10° turn:** the real stadium sits about 10° off east-west. The buildings line up with the track; the hills, roads and ball fields are turned to match.
+- **Stands match the photos:** the home side is 64 m long, just east of center; the visitor side is 50 m long, west of center, with its own little press box. Long jump runways were added in the east curve, and the west curve is paved red for the high jump. These replace the shot put circle, which isn't in the photos.
+**Next:** the designers check the new layout, then the UI direction.
+
+## 2026-10-01 (night): The race screen, in the school colors (UI direction, part 1)
+**Built:** the race display from `docs/UI_DIRECTION.md` §4. The interface panels switch from dark green to the school navy.
+- **Top-left:** lap dots (finished laps filled, the current one pulsing), LAP 2/4, and the clock in big outlined numbers. Each digit sits in a fixed-width box so the clock doesn't wobble.
+- **Top-right:** your place ("1st /8"), which lands with a little bounce when it changes.
+- **Bottom-right:** the kick button with your stamina as a ring around it (approved earlier). The ring is cream, turns gold while you kick, pulses below 25%, and is dashed when Flow State hides it. The button turns gray when you're too tired.
+- **Bottom-middle:** a gold KICK chip that springs in while you kick.
+- **Bottom-left:** today's conditions, your style, and your cards as small tags.
+- **Icons:** original two-tone icons (stopwatch, lap flag, medal, running shoe) in `web/icons.js`.
+- **Reduced motion:** pulsing and bouncing switch off when the device asks for less motion.
+
+**Decisions made (and why):**
+- **Kept a few small readouts the guide would leave out:** pace (the HotIce card scrambles it, so it has to be on screen) and the gaps to the runners just ahead and behind (rival tracking). They're small outlined text, not boxes. The designers can drop them.
+- **Lap splits moved** from a list on screen to a pop-up as each lap finishes; the full splits are on the results screen.
+
+**Next:** card picks (run path strip, select then Continue), then the menus and the Big Moment results.
+
+## 2026-10-01 (night, later): Card picks (UI direction, part 2)
+**Built:** `docs/UI_DIRECTION.md` §5 for every choice screen (card picks, runner pick, training).
+- **Select, then Continue:** tap a card and it lifts with a gold edge while the others dim; then tap Continue. This stops accidental picks mid-race. On a keyboard: press 1-3 to select, then Enter (or the same number again).
+- **Run path strip** on card picks: Start → Lap 1 → Lap 2 → Lap 3 → Finish, with passed stops filled and the current one pulsing.
+- **Cards:** cream paper on a darker paper layer, a colored type chip, a two-tone icon, a bigger title, and the effect text. They spring in one after another.
+- **One color and icon per card type:** Preparation navy clipboard, Strategy sky route, Encouragement plum heart, Pacing oak stopwatch, Push red bolt, Unique lavender star. Runners get a shoe and training gets a dumbbell. Green and gold are never used, since they mean "you" and "kicking".
+- **Buttons:** pills on a darker offset layer that squash when pressed. Gold for the main action, navy for the rest.
+
+**Decisions made (and why):**
+- **The run path has 5 stops, not 6.** The guide lists "Lap 4" and "Finish" separately, but they're the same moment (the end of lap 4).
+- **Unpicked cards dim by darkening, not by fading.** See-through cards let the stadium show through and looked messy.
+- **On phone-size screens** the card icon moves up next to the number, so all three runner cards and the Continue button fit without scrolling.
+
+## 2026-10-01 (night, latest): Menus and the Big Moment (UI direction, part 3)
+**Built:**
+- **Paper panels** for the home screen and confirmations: navy, a deeper navy layer offset below, a dashed inner outline like a lane marking, and a little spring when they appear. The home panel has the "1600m" logo in big outlined letters and four stat tiles (personal best, rain best, races run, training points).
+- **The Big Moment results card** (`docs/UI_DIRECTION.md` §8): a cream card with a red ribbon showing your place ("4th of 8"), your time counting up and landing with a bounce, a gold badge for a new personal best (or a runner best), and a real results table. Your row has a You-green bar and your rival's has a red one. On phone-size screens it splits into two columns, with your result on the left and the table on the right.
+- **Confetti** for a win or a new personal best: paper pieces in cream, gold, red and lavender, falling once. It's added to the style guide §9 as the second exception to "calm, no particles", after the kick.
+
+**Decisions made (and why):**
+- **One card for results and personal bests**, not two pop-ups in a row. The personal best is a badge on the results card, so you see everything at once.
+- **Browser wording for the personal best line.** The badge already says "New personal best!", so the line under it adds the detail ("25.9s faster than your old best, 7:08.5"). The terminal keeps its own wording.
+
+**Next:** the designers try it. After that: the Quaternius runner models (part 4b) and the real-phone test (part 5).
+
+## 2026-10-02: First playtest, and the balance fixes it led to
+**Designer feedback:** races are far too easy (winning by about 30 seconds); stats need explaining (on the menu, and a ? on cards); Determination is broken when you build it (kicked all race and never dropped below about 20% stamina); the UI should feel more like running (white lane lines on the kick button and cards).
+
+**What the simulations showed** (a new playtest script, 100–150 races per row):
+- **Kicking the whole race was the best strategy.** A kick cost only 2.5× normal stamina, so a full tank lasted about 2.6 laps of sprinting. Kicking all race won 73% of races with no cards, and 96% with random cards (68 s ahead on average).
+- **Determination rerolled every 5 seconds while you were low,** so a "35% chance" was really about 90% per lap, refilling up to 26 stamina. A Determination-35 build kicking all race won 100% of races, with its lowest stamina around 16–24% (matching the playtest).
+- **Cards were most of the easy wins:** a smart player with no cards won 15–22%; with random cards about 70%. Computer runners never got cards.
+
+**Decisions made (designers picked from simulated options):**
+- **Kicks cost 4× stamina** (was 2.5×). A full tank now lasts about 1.5 laps of kicking. Kicking all race went from 73% wins to 0%.
+- **Determination rolls once per lap**, the first time you're low that lap, so 35 Determination is a real 35% chance. The refill is halved: 5 + 0.3 per point (35 → +15.5 stamina). Stacked Determination builds that kick all race now win about 0–1%.
+- **Computer runners get 4 cards like you** (one before the race, one after each of laps 1–3): a random card with no special rules. This is the hard option. A player picking cards at random wins about 13% (average 4th place); good picks and a well-timed kick should win more. The gentler option was 2 cards (about 27%).
+
+**UI from the feedback:**
+- **"How stats work"** on the home screen, explaining all six stats in plain words (`data/statHelp.js`, editable text).
+- **A ? on every card** (card picks, runners, training) that opens a bubble explaining the stats that card touches, plus a note that card speed costs stamina. Tapping the ? never picks the card.
+- **Running-track touches:**
+  - card numbers painted like red lane numbers;
+  - a small red track bend with white lane lines in the corner of cards and panels;
+  - a white lane line inside panels;
+  - the stamina ring drawn as a two-lane red track with a white start line.
+- **Small fixes:** cards are now divs (so the ? can sit inside them); pressing Enter on the picked card confirms it.
+
+**Next:** the designers play a few races at the new difficulty. If it's too hard, the quickest dial is how many cards computer runners get.
+
+## 2026-10-02 (later): Second playtest tweaks
+**Designer asks:** nerf Speed by about 5% on all cards; slightly buff the stamina Determination gives.
+**Changed:**
+- **Every card's Speed is about 5% weaker:** +20 → +19, +10 → +9.5, +30 → +28.5. For +15 the exact 5% would be +14.25, so it became +14.5 to keep the card text tidy. Top Speed cards are unchanged.
+- **Determination refill: 5 + 0.4 per point** (was 0.3): 35 Determination → +19 stamina (was +15.5; before the first playtest it was +26). Still one roll per lap.
+
+**Simulated (150 races):** about the same as before.
+
+## 2026-10-02 (evening): Real runners, late-90s RPG style (step 5, part 4b)
+**Designer decision:** runner models inspired by Final Fantasy VII-era low-poly characters, instead of the planned Quaternius downloads. We borrow the style only, never FF7's characters or assets.
+
+**Built** (`web/runnerModel.js`):
+- **Construction:** runners made of rigid segments (hips, torso, head, upper arms, forearms, thighs, shins, shoes) joined at the joints, in flat colors with five-sided faceted limbs.
+- **Look:** a big head with a pointed chin and dark block eyes, big hands, chunky shoes with dark soles, a singlet with a race bib, and shorts. Five hair styles (spiky, ponytail, buzz, bun, crop).
+- **Variety:** kits set the shirt and shorts; skin, hair and shoe colors vary per runner (`RUNNER_LOOKS` in `web/colors.js`). Your runner keeps the You-green kit.
+- **The stride:**
+  - legs swing and knees fold through the swing;
+  - arms pump against the legs, with the shoulders twisting against the hips;
+  - the body leans forward and bobs twice per stride, and ponytails swing.
+  - Kicking (or surging) lengthens the stride, pumps the arms harder and leans in more.
+  - Finished runners jog to a stop.
+- **Performance:** each runner is built from small pieces, then each segment is baked into one vertex-colored mesh. That's 13–14 draw calls and about 400–470 triangles per runner (budget: 3,000). The kick glow still lights up only you (your runner has its own copy of the material).
+- **A close-up viewer** at `/dev/runners.html` on the dev server shows all eight runners running in place (keys 0–3 change the pace; drag to turn).
+
+**Decisions made (and why):**
+- **The stride rate follows effort, not true foot speed.** The race plays about 7× faster than real life, so feet matching the ground would be a blur. A readable stride matters more from the stadium camera.
+- **The style guide** now records the runner style and the "inspired by, never copied" rule.
+
+**Designer tweaks, same day:**
+- **Heads more head-shaped:** a faceted round skull with an angular jaw, a nose and ears (was a wedge). Hair now hugs the skull as a cap, with each style's spikes, tail or bun on top.
+- **Bigger, spikier shoulders:** a wider chest, and big angular shoulder caps with two spikes each (out-and-up, and a smaller out-and-back).
+- **Shoe-shaped shoes:** a wedge with a taller heel sloping down to a lower, narrower toe, an ankle collar, and a dark sole.
+- Now about 650–710 triangles per runner, still 13–14 draw calls. The viewer can zoom (scroll).
+
+**Second round of tweaks:**
+- Pointed elbows (a small spike out the back of each arm).
+- Shoes less blocky: a firm heel, a rounded toe box and an oval sole.
+- A smaller nose.
+- A sixth hair style, **sweatband**: a band round the forehead (bib-white) with a tuft standing straight up.
+- Fixed: the old style picker would have used only 3 of 6 styles; the new `hairStyleFor` spreads all 6 across the field.
+- About 880–960 triangles per runner (the rounded shoes), still 13–14 draw calls; budget is 3,000.
+
+**Next:** the designers check the runners in a race (they're small from the race camera, so overall shape and motion matter most).
+
+## 2026-10-02 (night): Front Runner nerf and the race camera
+**Designer asks:** Front Runner is a little too strong at the beginning (reduce by about 5%?); a race camera on your runner's shoulder.
+
+**Front Runner (simulated first, 300 races of computer runners):** Front Runners were usually near the front after lap 1 (2.75th on average) but finished mid-pack (4.0th) and won 16%, about an even share. Pacers are actually the strongest finishers (22% wins).
+- Cutting the surge by exactly 5% changed nothing visible.
+- **Decision: halve the lap 1 surge** (effort 0.07 → 0.035, so about 1% faster than their pace instead of 2%). Simulated: they sit 3.1st after lap 1 and win 14%, an even share.
+- The style test now compares a Front Runner's lap 1 with the same runner as a Pacer (lap 1 also includes the standing start).
+
+**Race camera:**
+- A camera button (above the kick button) or the C key switches between the stadium view and a camera over your runner's right shoulder, looking up the track.
+- It follows smoothly through the bends, glides in and out (about 0.9 s), and widens the lens up close. The arrow over your runner hides while it's on.
+- The menus always use the stadium view. Your choice is remembered in this browser.
+- Settings (distance, height, lens) are at the top of the race camera code in `web/main.js`.
+
+**Also:** the fans in the stands are 50% bigger, so they read from the stadium camera (`CROWD_SCALE` in `web/stadium.js`). The seat spacing already had room, so they don't overlap.
+
+**Card peek (designer ask):** tap any tag in the lower left of the race display (your cards, today's conditions, or your running style) and a small card pops up above the tags with its full text. Tap it, tap the tag again, or tap anywhere to close. A tap on the track that closes it doesn't also start a kick. The card-type icons moved to `web/icons.js` (`TYPE_ICONS`) so the card picks and the race display share them.
+
+**Next:** the designers try the race camera in a full race.
+
+## 2026-10-02 (later): Finishing step 6: rare cards and sounds
+**Rare cards:**
+- Unique and Rivalry cards (the ones that show up a third as often) get a lavender "foil" edge with a soft shine that sweeps across every few seconds.
+- They also get a badge: **RARE** in lavender, or **RIVALRY** in school red.
+- The same look shows in the race display's card peek. `cardLook()` in `src/cards.js` decides it, so the card picks and the peek always match. Gold stays for kicking and for the card you've picked.
+
+**Sounds,** made in code with Web Audio (no files, nothing to license), soft to match the calm look (`web/sound.js`):
+- a starting gun as the race begins, and a crowd murmur that builds on the last lap and cheers at the finish;
+- a last-lap bell (like a real meet);
+- a whoosh when your kick starts;
+- a soft tick when you select a card and a two-note chime when you confirm;
+- a short rising fanfare for a win or a personal best.
+
+Browsers only allow sound after a tap, so audio starts on the first tap. Mute with M anywhere, or the "Sound" button on the home screen (remembered in this browser).
+
+**Checked:** every sound plays without errors once a tap unlocks audio, and mute toggles. The designers should listen and say what's too loud, too quiet, or annoying.
+
+**Step 6 is done** (card UI, rare cards, a personal-best celebration, simple sound).
+
+## 2026-10-03: Going online (PLAN step 8)
+**Decision (designers):** host on **GitHub Pages** instead of Vercel. No new account, and it's set up entirely from GitHub. The trade-offs we accepted: a longer link, and no per-change preview links (Vercel's main advantage).
+- **Live at https://mysterwobble.github.io/TrackAndField/**
+- `.github/workflows/deploy.yml`: every push to main installs, runs the tests (nothing goes live if they fail), builds, and publishes.
+- `vite.config.js`: the built game lives under `/TrackAndField/`; the dev server still serves from `/`, so the home-Wi-Fi link keeps working. The music paths now use Vite's `BASE_URL`, so they work in both places.
+- Checked the built version locally under `/TrackAndField/` (home, race, music loading) before publishing.
+- **Sharing notes:** saves stay in each person's browser (no shared leaderboard until step 7). The first load is slower on mobile data because of the two 5 MB music tracks.
+
+**Music decision (designers):** the designers made two tracks in Suno: a base track for menus and racing, and a more intense version for the last lap. AI-made music is allowed (the "no AI-generated art" rule stays for visuals). They're on a paid Suno plan, which grants commercial use, so the tracks can ship in the public game. Credited in CREDITS.md.
+
+**Music added** (`public/music/`, played by `web/sound.js`):
+- The base track (`MainRaceMusic.mp3`, 3:42) loops in the menus and the race. The intense version (`SlightlyMoreIntenseRaceMusic.mp3`, 4:03) takes over for the last lap with a 2.5-second crossfade, and fades back for the menus.
+- Both start on the first tap and loop together (the intense one silent until needed), which phones need in order to play it later without another tap.
+- When switching, the incoming track jumps to the same point in the song. The tracks are different lengths, so if the switch sounds off musically, the alternative is starting the intense one from its beginning.
+- Home screen: "Music: on/off" (music only); M still mutes everything. Both are remembered.
+- **Speaker button (designer ask):** a round speaker button in the top-right corner on every screen (menus and races, just under your place). It turns all sound on or off, the same as M, showing sound waves or an X. It replaced the home screen's "Sound" button.
+- **Fixed (playtest):** the music stayed on the intense track after a race, so after "Race again" there was nothing to switch to on lap 4. Every race now starts on the base track.
+- **Removed the crowd murmur and finish cheer** (playtest: "white noise through the speaker"). Made from filtered noise, they sounded like static; the music carries the mood instead.
+- **Sound pauses when the game is out of sight** (another tab or app, or a locked phone) and picks up when you come back.
+- **Fixed:** the speaker and camera buttons kept keyboard focus after a tap, so pressing Enter or Space (kick) afterwards pressed them again. They now let go of focus.
+- **Size:** about 5 MB per track, fine on Wi-Fi. When we deploy, consider trimming them to a shorter loop or a lower bitrate so phones on mobile data load faster (there's no audio tool on this computer to do it now). Then: rarity colors and sounds (step 6), or deploy (step 8). A player picking cards at random wins about 10% (average 4th). Computer runners use the same cards, so the Speed nerf hits them too. Stacked Determination builds that kick all race win 1–4%, so the buff doesn't bring back the old exploit.
+
 ---
 
 ## Milestones

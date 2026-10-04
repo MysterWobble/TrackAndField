@@ -1,13 +1,31 @@
-/* The game's colors and font (SPEC section 9). */
+/* The game's UI, from docs/STYLE_GUIDE.md §10 and docs/UI_DIRECTION.md (and the backdrop from §5).
+   Panels use the school's navy; cream paper cards; gold means kicking and highlights; green means you. */
 :root {
-  --track-red: #c8553d;
-  --infield-green: #5fa04e;
-  --sky-blue: #8ec9f0;
-  --lane-white: #f7f4ea;
-  --you-green: #2ee66b;
-  --gold: #f2b33d;
-  --navy: #1f2a44;
-  --gap: max(12px, env(safe-area-inset-left));
+  --panel: #2c3e73; /* school navy */
+  --panel-deep: #1b2650; /* the darker paper layer behind navy panels, and number outlines */
+  --cream: #f4ecd8;
+  --cream-shade: #d9cba8; /* the darker facet on cream icons */
+  --cream-deep: #cdbb98; /* the paper layer behind cream cards */
+  --ink: #22304a;
+  --gold: #e8b84b;
+  --gold-deep: #b8913f;
+  --you: #34b98a;
+  --you-deep: #23825f;
+  --track: #c8544a; /* school red */
+  --tired: #8a8578;
+  --olive: #8a9a5b;
+  --radius: 16px;
+  --pill: 999px;
+  --shadow: 0 4px 14px rgba(18, 26, 52, 0.35);
+  --gap: max(12px, env(safe-area-inset-left), env(safe-area-inset-right));
+  --gap-top: max(10px, env(safe-area-inset-top));
+  --gap-bottom: max(10px, env(safe-area-inset-bottom));
+  /* Motion (UI_DIRECTION.md §6-7): springy entrances, quick exits, nothing linear. */
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --t-fast: 120ms;
+  --t-med: 260ms;
+  --t-big: 420ms;
   font-family: "Baloo 2", system-ui, sans-serif;
 }
 
@@ -16,8 +34,9 @@ body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  background: var(--sky-blue);
-  color: var(--navy);
+  /* The warm backdrop behind the transparent 3D canvas: costs nothing on the GPU. */
+  background: radial-gradient(ellipse at 50% 45%, #efe6d0 0%, #e3d5b8 60%, #cdbb98 100%);
+  color: var(--cream);
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
@@ -31,179 +50,414 @@ body {
   display: block;
 }
 
-/* ---------- Race display ---------- */
+/* ---------- Race display (docs/UI_DIRECTION.md §4) ---------- */
 
 #hud {
   position: fixed;
   inset: 0;
-  pointer-events: none; /* taps go through to the game, except on buttons */
+  pointer-events: none; /* taps go through to the game, except on the kick button */
+  --icon-base: var(--cream);
+  --icon-facet: var(--cream-shade);
+  --icon-line: var(--panel-deep);
+}
+#hud.off {
+  display: none;
 }
 
-.panel {
+.icon {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  overflow: visible;
+  filter: drop-shadow(0 2px 3px rgba(18, 26, 52, 0.35));
+}
+
+/* The corners: no boxes, just outlined numbers and icons. A soft dark glow behind keeps them readable
+   over bright parts of the scene. */
+.hud-corner {
   position: absolute;
-  padding: 6px 14px;
-  border-radius: 14px;
-  background: rgba(247, 244, 234, 0.9);
-  font-weight: 700;
-  line-height: 1.25;
-  white-space: pre-line;
+  top: var(--gap-top);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: 28px;
+  background: radial-gradient(ellipse at center, rgba(18, 26, 52, 0.28) 0%, rgba(18, 26, 52, 0) 72%);
 }
-
-.hud-info {
-  top: var(--gap);
-  left: var(--gap);
-  font-size: 14px;
-  max-width: 34vw;
-}
-
 .hud-lap {
-  top: var(--gap);
-  left: 50%;
-  transform: translateX(-50%);
-  text-align: center;
-  font-size: 22px;
-  font-weight: 800;
-}
-
-.hud-position {
-  top: var(--gap);
-  right: var(--gap);
-  text-align: right;
-  font-size: 15px;
-}
-.hud-position::first-line {
-  font-size: 26px;
-  font-weight: 800;
-}
-
-.hud-bottom {
-  bottom: var(--gap);
   left: var(--gap);
-  width: min(300px, 40vw);
-  font-size: 14px;
+}
+.hud-place {
+  right: var(--gap);
+  align-items: flex-end;
+}
+.hud-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.stamina-bar {
-  height: 16px;
-  margin: 4px 0 6px;
-  border-radius: 8px;
-  background: rgba(31, 42, 68, 0.2);
-  overflow: hidden;
+/* Outlined numbers: cream with a deep navy outline and a soft shadow. */
+.hud-num {
+  color: var(--cream);
+  font-weight: 800;
+  line-height: 1;
+  -webkit-text-stroke: 6px var(--panel-deep);
+  paint-order: stroke fill; /* keeps the outline outside the letters */
+  text-shadow: 0 3px 6px rgba(18, 26, 52, 0.35);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
-.stamina-fill {
-  height: 100%;
-  background: var(--you-green);
-  transition: width 0.15s linear;
+.hud-num-big {
+  font-size: 32px;
 }
-.stamina-fill.low {
-  background: var(--track-red);
+.hud-num-small {
+  font-size: 22px;
 }
-.stamina-fill.hidden-stat {
-  background: repeating-linear-gradient(45deg, #b9b3a3 0 8px, #d9d4c3 8px 16px);
+.hud-num-of {
+  font-size: 20px;
+  align-self: flex-end;
+  margin-bottom: 2px;
+  margin-left: 1px;
 }
-
-.splits {
-  margin-top: 4px;
+.hud-num .digit {
+  display: inline-block;
+  width: 0.58em;
+  text-align: center;
+}
+.hud-num .sep {
+  display: inline-block;
+  width: 0.3em;
+  text-align: center;
+}
+.hud-small {
+  color: var(--cream);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 700;
+  line-height: 1.2;
+  -webkit-text-stroke: 4px var(--panel-deep);
+  paint-order: stroke fill;
+  white-space: pre;
+}
+.hud-place .hud-small {
+  text-align: right;
 }
 
-/* The kick button: big, round, under your right thumb. */
-.kick-button {
-  position: absolute;
-  right: calc(var(--gap) + 8px);
-  bottom: calc(var(--gap) + 8px);
-  width: 112px;
-  height: 112px;
+/* Lap dots: finished laps filled, the current one pulsing gently, the rest hollow. */
+.pips {
+  display: flex;
+  gap: 5px;
+}
+.pip {
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  border: 5px solid var(--navy);
-  background: var(--you-green);
-  color: var(--navy);
-  font: 800 17px/1.1 "Baloo 2", system-ui, sans-serif;
-  white-space: pre-line;
-  pointer-events: auto;
-  touch-action: none;
-  box-shadow: 0 6px 0 var(--navy);
+  border: 3px solid var(--panel-deep);
+  background: rgba(244, 236, 216, 0.25);
+  box-shadow: 0 2px 3px rgba(18, 26, 52, 0.3);
 }
-.kick-button.on {
-  background: var(--gold);
-  transform: translateY(4px) scale(1.06);
-  box-shadow: 0 2px 0 var(--navy), 0 0 30px 10px rgba(242, 179, 61, 0.8);
-  animation: throb 0.2s ease-in-out infinite alternate;
+.pip.done {
+  background: var(--cream);
 }
-.kick-button.tired {
-  background: #b9b3a3;
+.pip.now {
+  background: var(--cream);
+  animation: pip-pulse 1.4s ease-in-out infinite;
 }
-@keyframes throb {
-  to {
-    box-shadow: 0 2px 0 var(--navy), 0 0 45px 18px rgba(242, 179, 61, 0.9);
+@keyframes pip-pulse {
+  50% {
+    transform: scale(1.25);
+    background: var(--cream-shade);
   }
 }
 
-/* Nitro glow around the screen edges while you kick, with streaking speed lines. */
+/* Your place lands with a small bounce when it changes. */
+.bump {
+  display: inline-block;
+  animation: land var(--t-big) var(--spring);
+}
+@keyframes land {
+  from {
+    transform: scale(1.3);
+  }
+}
+
+/* Bottom-left tags: conditions and style as navy paper chips, cards as cream ones. */
+.hud-tag-area {
+  position: absolute;
+  left: var(--gap);
+  bottom: var(--gap-bottom);
+  max-width: 38vw;
+  display: flex;
+  flex-direction: column-reverse; /* the peek opens above the tags */
+  align-items: flex-start;
+  gap: 8px;
+}
+.hud-tags {
+  display: flex;
+  flex-wrap: wrap-reverse;
+  gap: 5px;
+}
+.tag {
+  border: 2px solid transparent;
+  font-family: inherit;
+  line-height: 1.35;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: transform var(--t-fast) var(--spring);
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 10px;
+  border-radius: var(--pill);
+  background: var(--panel);
+  box-shadow: 0 3px 0 var(--panel-deep);
+  color: var(--cream);
+  font-size: 12px;
+  font-weight: 700;
+}
+.tag-card {
+  background: var(--cream);
+  box-shadow: 0 3px 0 var(--cream-deep);
+  color: var(--ink);
+}
+
+/* The KICK chip: gold, only while kicking, springs in. */
+.kick-chip {
+  position: absolute;
+  left: 50%;
+  bottom: var(--gap-bottom);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 18px 4px 12px;
+  border-radius: var(--pill);
+  background: var(--gold);
+  box-shadow: 0 4px 0 var(--gold-deep), 0 0 22px 4px rgba(232, 184, 75, 0.45);
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 800;
+  --icon-base: var(--cream);
+  --icon-facet: var(--cream-shade);
+  --icon-line: var(--ink);
+  opacity: 0;
+  transform: translateX(-50%) scale(0.6);
+  transition:
+    opacity var(--t-fast) var(--ease-out),
+    transform var(--t-fast) var(--ease-out);
+}
+.kick-chip.on {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+  transition:
+    opacity var(--t-fast) var(--ease-out),
+    transform var(--t-med) var(--spring);
+}
+
+/* The kick button, with your stamina as a ring around it, drawn as a little red track (the same red as the
+   real one, not a traffic-light meter). Gold while you kick, and pulses when you're running low. */
+.kick {
+  position: absolute;
+  right: var(--gap);
+  bottom: var(--gap-bottom);
+  width: 124px;
+  height: 124px;
+}
+.ring {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg); /* the ring starts at the top */
+  filter: drop-shadow(0 3px 4px rgba(18, 26, 52, 0.35));
+}
+.ring circle {
+  fill: none;
+  stroke-width: 10;
+}
+.ring-track {
+  stroke: var(--panel-deep);
+}
+.ring-fill {
+  stroke: var(--track); /* your stamina is the track left to run: red lanes, white lines */
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.15s ease-out;
+}
+.kick.on .ring-fill {
+  stroke: var(--gold);
+}
+.kick.low .ring-fill {
+  animation: ring-pulse 0.8s ease-in-out infinite;
+}
+@keyframes ring-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+.kick.hidden-stat .ring-fill {
+  stroke: var(--cream-shade);
+  stroke-dasharray: 6 10;
+  stroke-linecap: butt;
+}
+
+.kick-button {
+  position: absolute;
+  inset: 16px;
+  border: none;
+  border-radius: 50%;
+  background: var(--you);
+  box-shadow: 0 5px 0 var(--you-deep);
+  color: var(--panel-deep);
+  font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: pointer;
+  --icon-base: var(--cream);
+  --icon-facet: var(--cream-shade);
+  --icon-line: var(--panel-deep);
+  transition:
+    transform var(--t-fast) var(--spring),
+    box-shadow var(--t-fast) var(--spring),
+    background var(--t-fast) var(--ease-out);
+}
+.kick-button .icon {
+  width: 28px;
+  height: 28px;
+  filter: none;
+}
+.kick-label {
+  font-size: 18px;
+  font-weight: 800;
+}
+.kick-stamina {
+  font-size: 13px;
+  font-weight: 700;
+}
+.kick.on .kick-button {
+  background: var(--gold);
+  box-shadow: 0 1px 0 var(--gold-deep);
+  transform: translateY(4px) scale(0.96); /* pressed in */
+}
+.kick.tired .kick-button {
+  background: var(--tired);
+  box-shadow: 0 5px 0 var(--panel-deep);
+  color: var(--cream);
+}
+
+/* The kick: a soft gold vignette at the edges with faint cream speed lines (STYLE_GUIDE.md §9). */
 .kick-glow {
   position: absolute;
   inset: 0;
   opacity: 0;
-  transition: opacity 0.15s;
+  transition: opacity 0.25s ease-out;
   background:
-    radial-gradient(ellipse at center, transparent 55%, rgba(242, 179, 61, 0.55) 100%),
-    repeating-linear-gradient(90deg, transparent 0 60px, rgba(255, 255, 255, 0.18) 60px 64px);
+    radial-gradient(ellipse at center, transparent 55%, rgba(232, 184, 75, 0.42) 100%),
+    repeating-linear-gradient(90deg, transparent 0 70px, rgba(244, 236, 216, 0.12) 70px 73px);
   background-size: 100% 100%, 200% 100%;
-  /* Only around the edges, so the race in the middle stays clear. */
   -webkit-mask-image: radial-gradient(ellipse at center, transparent 45%, black 85%);
   mask-image: radial-gradient(ellipse at center, transparent 45%, black 85%);
 }
 .kick-glow.on {
   opacity: 1;
-  animation: streak 0.35s linear infinite;
+  animation: streak 0.45s linear infinite; /* the scene's speed lines, not the interface: steady is right here */
 }
 @keyframes streak {
   from {
     background-position: 0 0, 0 0;
   }
   to {
-    background-position: 0 0, -128px 0;
+    background-position: 0 0, -146px 0;
   }
 }
 
-/* Pop-up messages */
+/* Pop-up messages, top center, as navy paper pills with a colored edge. */
 .messages {
   position: absolute;
-  top: 90px;
+  top: var(--gap-top);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
+  max-width: 36vw;
 }
 .toast {
-  padding: 4px 14px;
-  border-radius: 12px;
+  padding: 3px 14px;
+  border: 2px solid transparent;
+  border-radius: var(--pill);
+  background: var(--panel);
+  box-shadow: 0 3px 0 var(--panel-deep);
+  color: var(--cream);
+  font-size: 14px;
   font-weight: 700;
-  font-size: 16px;
-  background: rgba(247, 244, 234, 0.95);
-  transition: opacity 0.6s;
+  text-align: center;
+  animation: pop-in var(--t-med) var(--spring);
+  transition: opacity 0.6s var(--ease-out);
 }
 .toast.good {
-  border: 3px solid var(--you-green);
+  border-color: var(--you);
 }
 .toast.bad {
-  border: 3px solid var(--track-red);
+  border-color: var(--track);
 }
 .toast.info {
-  border: 3px solid var(--gold);
+  border-color: var(--cream-shade);
 }
 .toast.fade {
   opacity: 0;
 }
-
-#hud.off {
-  display: none;
+@keyframes pop-in {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
 }
 
-/* ---------- Menus, card picks, and results (plain for now; step 6 makes them pretty) ---------- */
+/* Short screens (a phone held sideways): slightly smaller race display. */
+@media (max-height: 500px) {
+  .hud-num-big {
+    font-size: 28px;
+  }
+  .hud-num-small {
+    font-size: 20px;
+  }
+  .kick {
+    width: 112px;
+    height: 112px;
+  }
+  .kick-button {
+    inset: 14px;
+  }
+  .toast {
+    font-size: 13px;
+  }
+}
+
+/* Reduced motion: no pulsing or bouncing, just simple fades. */
+@media (prefers-reduced-motion: reduce) {
+  .pip.now,
+  .kick.low .ring-fill,
+  .bump,
+  .toast {
+    animation: none;
+  }
+  .kick-chip,
+  .kick-chip.on {
+    transform: translateX(-50%);
+  }
+  .kick.on .kick-button {
+    transform: none;
+  }
+  .kick-glow.on {
+    animation: none;
+  }
+}
+
+/* ---------- Menus, card picks, and results ---------- */
 
 #screens {
   position: fixed;
@@ -211,147 +465,1080 @@ body {
   pointer-events: none; /* only the menu itself (when showing) takes taps */
 }
 
-.note {
-  max-width: min(640px, 90vw);
-  padding: 2px 14px;
-  border-radius: 10px;
-  background: rgba(247, 244, 234, 0.92);
-  font-size: 16px;
-  font-weight: 600;
-  text-align: center;
-}
-.note.good {
-  border: 3px solid var(--you-green);
-  font-weight: 800;
-}
-.note.gold {
-  border: 3px solid var(--gold);
-  font-weight: 800;
-}
-.note.bad {
-  border: 3px solid var(--track-red);
-}
-
-.buttons {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-.button {
-  padding: 8px 20px;
-  border: 4px solid var(--navy);
-  border-radius: 14px;
-  background: var(--lane-white);
-  color: var(--navy);
-  font: 800 17px "Baloo 2", system-ui, sans-serif;
-  cursor: pointer;
-}
-.button.primary {
-  background: var(--you-green);
-}
-.button:hover {
-  transform: translateY(-2px);
-}
-
-.overlay {
-  overflow-y: auto;
-  justify-content: safe center; /* on short phone screens, tall menus scroll instead of getting cut off */
-}
-
 .overlay {
   position: absolute;
   inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 14px;
-  padding: 16px;
-  background: rgba(31, 42, 68, 0.55);
+  justify-content: safe center; /* on short phone screens, tall menus scroll instead of getting cut off */
+  gap: 12px;
+  padding: max(16px, var(--gap-top)) var(--gap) max(16px, var(--gap-bottom));
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: rgba(18, 26, 52, 0.3);
   pointer-events: auto;
+  animation: fade-in var(--t-med) var(--ease-out);
+}
+.overlay.dim {
+  background: rgba(18, 26, 52, 0.5);
 }
 .overlay.hidden {
   display: none;
 }
-.overlay h2 {
-  margin: 0;
-  padding: 4px 18px;
-  border-radius: 12px;
-  background: var(--lane-white);
-  font-size: 24px;
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
 }
 
+/* Over the scene (card picks), the title is a navy paper pill. */
+.overlay > h2 {
+  margin: 0;
+  padding: 4px 22px;
+  border-radius: var(--pill);
+  background: var(--panel);
+  box-shadow: 0 4px 0 var(--panel-deep);
+  color: var(--cream);
+  font-size: 24px;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Lines of text: navy pills over the scene; inside panels and cards they lose the pill. */
+.note {
+  max-width: min(640px, 90vw);
+  padding: 3px 16px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: 0 3px 0 var(--panel-deep);
+  color: var(--cream);
+  font-size: 15px;
+  font-weight: 500;
+  text-align: center;
+}
+.note.good,
+.note.gold {
+  font-weight: 700;
+}
+.note.good {
+  border: 2px solid var(--you);
+}
+.note.gold {
+  border: 2px solid var(--gold);
+}
+.note.bad {
+  border: 2px solid var(--track);
+}
+
+/* The paper panel (UI_DIRECTION.md §6): navy, a deeper navy layer offset below it, and a dashed inner
+   outline like a lane marking. Pops in with a little spring. */
+.sheet {
+  width: min(520px, 92vw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 24px 22px;
+  border-radius: 22px;
+  background: var(--panel);
+  box-shadow: 0 6px 0 var(--panel-deep), 0 14px 24px rgba(18, 26, 52, 0.3);
+  outline: 2px solid rgba(255, 255, 255, 0.3); /* a lane line */
+  outline-offset: -9px;
+  color: var(--cream);
+  animation: pop var(--t-med) var(--spring);
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+.sheet h2 {
+  margin: 0;
+  color: var(--cream);
+  font-size: 24px;
+  font-weight: 800;
+  text-align: center;
+  line-height: 1.15;
+}
+.sheet .note {
+  background: none;
+  box-shadow: none;
+  padding: 0 4px;
+}
+.sheet .note.good,
+.sheet .note.gold,
+.sheet .note.bad {
+  border: none;
+}
+.sheet .note.good {
+  color: #8fe0bf; /* a light You green that reads on navy */
+}
+.sheet .note.gold {
+  color: var(--gold);
+}
+.sheet .note.bad {
+  color: #f0a79e;
+}
+
+/* The game's name on the home panel: big cream letters with a deep navy outline. */
+.logo {
+  margin: -4px 0 0;
+  color: var(--cream);
+  font-size: 52px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  -webkit-text-stroke: 8px var(--panel-deep);
+  paint-order: stroke fill;
+  text-shadow: 0 4px 0 var(--panel-deep);
+}
+
+/* Stat tiles (home): an icon, a big number, a small label. */
+.stats {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  --icon-base: var(--cream);
+  --icon-facet: var(--cream-shade);
+  --icon-line: var(--panel-deep);
+}
+.stat {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 14px;
+  background: var(--panel-deep);
+}
+.stat .icon {
+  grid-row: span 2;
+  width: 28px;
+  height: 28px;
+  filter: none;
+}
+.stat-value {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+.stat-label {
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.8;
+}
+
+/* ---------- The Big Moment (results) ---------- */
+
+/* A cream card that pops in on a little stage, with a ribbon across the top. */
+.moment {
+  position: relative;
+  width: min(560px, 94vw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 30px 22px 20px;
+  margin-top: 18px; /* room for the ribbon */
+  border-radius: 22px;
+  background: var(--cream);
+  box-shadow: 0 7px 0 var(--cream-deep), 0 16px 28px rgba(18, 26, 52, 0.35);
+  color: var(--ink);
+  animation: pop var(--t-big) var(--spring);
+}
+.ribbon {
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  width: 300px;
+  height: 64px;
+  transform: translateX(-50%);
+}
+.ribbon svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.ribbon-band {
+  fill: var(--track);
+}
+.ribbon-tail {
+  fill: #a5443c;
+}
+.ribbon-fold {
+  fill: #7d332d;
+}
+.ribbon-text {
+  position: absolute;
+  inset: 4px 30px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cream);
+  font-size: 28px;
+  font-weight: 800;
+  -webkit-text-stroke: 5px #7d332d;
+  paint-order: stroke fill;
+}
+.ribbon-of {
+  margin-left: 6px;
+  font-size: 18px;
+}
+.moment-time {
+  color: var(--ink);
+  font-size: 46px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.moment-time.landed {
+  animation: land var(--t-big) var(--spring);
+}
+.moment-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 14px 2px 8px;
+  border-radius: var(--pill);
+  background: var(--gold);
+  box-shadow: 0 3px 0 var(--gold-deep);
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 800;
+  --icon-base: var(--cream);
+  --icon-facet: var(--cream-shade);
+  --icon-line: var(--ink);
+  animation: pop var(--t-big) var(--spring) 0.8s backwards; /* after the time lands */
+}
+.moment-badge .icon {
+  filter: none;
+}
+.moment .note {
+  background: none;
+  box-shadow: none;
+  border: none;
+  color: var(--ink);
+  padding: 0;
+}
+.moment .buttons {
+  margin-top: 4px;
+}
+.moment .button:not(.primary) {
+  box-shadow: 0 4px 0 var(--panel-deep);
+}
+
+/* The results table: yours gets a You-green bar, your rival a red one. */
+.results {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 2px;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.results th {
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.6;
+}
+.results td {
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+.results td:first-child {
+  font-weight: 800;
+  border-left: 5px solid transparent;
+  border-radius: 6px 0 0 6px;
+}
+.results td:last-child {
+  border-radius: 0 6px 6px 0;
+  opacity: 0.7;
+}
+.results tr.you td {
+  background: rgba(52, 185, 138, 0.18);
+  font-weight: 800;
+}
+.results tr.you td:first-child {
+  border-left-color: var(--you);
+}
+.results tr.rival td:first-child {
+  border-left-color: var(--track);
+}
+
+/* Confetti: small paper pieces that flutter down once over the Big Moment (STYLE_GUIDE.md §9 exception). */
+.confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.confetti span {
+  position: absolute;
+  top: -12px;
+  width: 9px;
+  height: 14px;
+  border-radius: 2px;
+  box-shadow: 0 1px 0 rgba(18, 26, 52, 0.25);
+  animation: confetti-fall 1.2s cubic-bezier(0.3, 0.1, 0.6, 1) forwards;
+}
+@keyframes confetti-fall {
+  to {
+    transform: translate(var(--drift), 70vh) rotate(var(--spin));
+    opacity: 0;
+  }
+}
+
+/* The run path: Start, the lap lines, Finish, joined by a dotted cream path (UI_DIRECTION.md §5).
+   Passed stops are filled, the current one pulses gently, the rest are hollow. */
+.run-path {
+  display: flex;
+  align-items: flex-start;
+  padding: 2px 4px;
+}
+.stop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 52px;
+}
+.dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 3px solid var(--panel-deep);
+  background: rgba(244, 236, 216, 0.3);
+  box-shadow: 0 2px 0 var(--panel-deep);
+  display: grid;
+  place-items: center;
+  --icon-base: var(--cream);
+  --icon-facet: var(--cream-shade);
+  --icon-line: var(--panel-deep);
+}
+.dot .icon {
+  width: 16px;
+  height: 16px;
+  filter: none;
+}
+.stop.done .dot,
+.stop.now .dot {
+  background: var(--cream);
+}
+.stop.now .dot {
+  animation: pip-pulse 1.4s ease-in-out infinite;
+}
+.stop-label {
+  color: var(--cream);
+  font-size: 12px;
+  font-weight: 800;
+  -webkit-text-stroke: 4px var(--panel-deep);
+  paint-order: stroke fill;
+  white-space: nowrap;
+}
+.stop.now .stop-label {
+  font-size: 13px;
+}
+.trail {
+  width: 34px;
+  margin: 8px -12px 0;
+  border-top: 3px dotted rgba(244, 236, 216, 0.55);
+}
+.trail.done {
+  border-top-color: var(--cream);
+}
+
+/* Choice cards: cream paper on a darker paper layer, with a colored type chip and a two-tone icon. */
 .cards {
   display: flex;
-  gap: 14px;
+  gap: 16px;
   flex-wrap: wrap;
   justify-content: center;
 }
 .card {
+  box-sizing: border-box; /* padding and border count inside the width (cards are divs now, not buttons) */
+  position: relative;
+  isolation: isolate; /* keeps the corner track bend behind the card's text */
+  --cat: var(--panel);
+  --cat-text: var(--cream);
   width: min(230px, 28vw);
-  min-height: 180px;
-  padding: 12px;
-  border: 4px solid var(--navy);
-  border-radius: 16px;
-  background: var(--lane-white);
-  color: var(--navy);
+  min-height: 280px;
+  padding: 12px 14px 14px;
+  border: 3px solid transparent;
+  border-radius: var(--radius);
+  background: var(--cream);
+  box-shadow: 0 6px 0 var(--cream-deep), 0 12px 20px rgba(18, 26, 52, 0.2);
+  color: var(--ink);
   font-family: inherit;
   text-align: left;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  animation: card-in var(--t-med) var(--spring) backwards;
+  animation-delay: calc(var(--i, 0) * 60ms); /* one after another */
+  transition:
+    transform var(--t-fast) var(--spring),
+    opacity var(--t-fast) var(--ease-out),
+    border-color var(--t-fast) var(--ease-out),
+    box-shadow var(--t-fast) var(--ease-out);
+}
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.9);
+  }
 }
 .card:hover {
-  transform: translateY(-4px);
-  border-color: var(--you-green);
+  transform: translateY(-2px);
 }
-.card-key {
-  align-self: flex-end;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: var(--navy);
-  color: var(--lane-white);
-  text-align: center;
-  font-weight: 800;
+.card:focus-visible {
+  outline: 3px dashed var(--panel);
+  outline-offset: 3px;
 }
-.card-type {
-  font-size: 13px;
-  font-weight: 800;
-  text-transform: uppercase;
-  color: var(--track-red);
+.card.picked {
+  transform: translateY(-6px);
+  border-color: var(--gold);
+  box-shadow: 0 10px 0 var(--cream-deep), 0 16px 24px rgba(18, 26, 52, 0.25);
 }
-.card-name {
-  font-size: 17px;
-  font-weight: 800;
-  line-height: 1.15;
+.cards.has-pick .card:not(.picked) {
+  filter: brightness(0.7) saturate(0.7); /* dimmed, but still solid paper (see-through cards look messy over the scene) */
 }
-.card-text {
-  font-size: 14px;
-  line-height: 1.25;
-}
-.type-unique .card-type {
-  color: #9b5de5;
+.card:active {
+  transform: translateY(-4px) scale(0.97);
 }
 
-.results {
-  padding: 10px 16px;
-  border-radius: 12px;
-  background: var(--lane-white);
-  font: 600 15px/1.5 ui-monospace, Consolas, monospace;
-  white-space: pre;
+.card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
 }
-.result.you {
-  color: #178a3f;
+.card-type {
+  padding: 1px 10px;
+  border-radius: var(--pill);
+  background: var(--cat);
+  color: var(--cat-text);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card-key {
+  flex: none;
+  min-width: 22px;
+  height: 24px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--track);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.15);
+  color: #fff;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 24px;
+}
+
+/* The ? button and its explanation bubble (covers the card until tapped). */
+.card-help-button {
+  flex: none;
+  margin-left: auto;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  color: var(--ink);
+  text-align: center;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 20px;
+  cursor: pointer;
+}
+.card-help-button:hover {
+  background: var(--ink);
+  color: var(--cream);
+}
+.card-help {
+  display: none;
+  position: absolute;
+  inset: 6px;
+  z-index: 2;
+  overflow-y: auto;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 4px 0 var(--panel-deep);
+  color: var(--cream);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+  cursor: pointer;
+}
+.card.show-help .card-help {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: pop var(--t-med) var(--spring);
+}
+.card-help b {
+  color: var(--gold);
   font-weight: 800;
 }
-.again {
-  padding: 8px 22px;
-  border: 4px solid var(--navy);
-  border-radius: 14px;
-  background: var(--you-green);
-  font: 800 18px "Baloo 2", system-ui, sans-serif;
+.card-help-close {
+  margin-top: auto;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.6;
+  text-align: center;
+}
+.card-icon {
+  --icon-base: var(--cat);
+  --icon-facet: color-mix(in srgb, var(--cat) 70%, var(--ink));
+  --icon-line: var(--ink);
+  margin: 4px 0 2px;
+}
+.card-icon .icon {
+  width: 44px;
+  height: 44px;
+  filter: none;
+}
+.card-name {
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.12;
+}
+.card-text {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+/* Card type colors: never You green or gold, which already mean "you" and "kicking". */
+.type-preparation {
+  --cat: #2c3e73; /* navy */
+}
+.type-strategy {
+  --cat: #6fa8d6; /* sky */
+  --cat-text: var(--ink);
+}
+.type-encouragement {
+  --cat: #7a4e7e; /* plum */
+}
+.type-pacing {
+  --cat: #8b5a2b; /* oak */
+}
+.type-push {
+  --cat: #c8544a; /* school red */
+}
+.type-unique {
+  --cat: #b39cd0; /* lavender */
+  --cat-text: var(--ink);
+}
+
+/* Short screens (a phone held sideways is about 390px tall): tighter menus so 3 cards fit without scrolling.
+   Nothing goes below 12px (STYLE_GUIDE.md §10). */
+@media (max-height: 500px) {
+  .overlay {
+    gap: 6px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  .overlay > h2 {
+    font-size: 20px;
+    padding: 2px 18px;
+  }
+  .note {
+    font-size: 13px;
+    padding: 2px 12px;
+  }
+  /* Panels: tighter, with the stat tiles in one row. */
+  .sheet {
+    width: min(640px, 92vw);
+    gap: 8px;
+    padding: 14px 20px 16px;
+  }
+  .sheet h2 {
+    font-size: 20px;
+  }
+  .logo {
+    font-size: 40px;
+  }
+  .stats {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .stat {
+    padding: 4px 8px;
+    column-gap: 6px;
+  }
+  .stat .icon {
+    width: 22px;
+    height: 22px;
+  }
+  .stat-value {
+    font-size: 18px;
+  }
+  /* The Big Moment: two columns (your result on the left, the table on the right) so it fits sideways. */
+  .moment {
+    width: min(760px, 96vw);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+    grid-auto-rows: min-content;
+    align-content: center;
+    justify-items: center;
+    column-gap: 18px;
+    row-gap: 6px;
+    padding: 24px 16px 14px;
+  }
+  .moment > * {
+    grid-column: 1;
+  }
+  .moment > .results {
+    grid-column: 2;
+    grid-row: 1 / span 6;
+    align-self: center;
+  }
+  .moment-time {
+    font-size: 38px;
+  }
+  .ribbon {
+    left: 25%;
+    width: 240px;
+    height: 54px;
+    top: -20px;
+  }
+  .ribbon-text {
+    font-size: 24px;
+  }
+  .card {
+    min-height: 0;
+    padding: 8px 10px 10px;
+    gap: 3px;
+  }
+  .cards {
+    gap: 12px;
+  }
+  .card {
+    position: relative;
+    width: min(250px, 30vw);
+  }
+  .card-icon {
+    position: absolute; /* up in the top row, next to the number, to save height */
+    top: 6px;
+    right: 80px; /* left of the ? and the lane number */
+    margin: 0;
+  }
+  .card-icon .icon {
+    width: 26px;
+    height: 26px;
+  }
+  .card-name {
+    font-size: 16px;
+  }
+  .card-text {
+    font-size: 13px;
+    line-height: 1.22;
+  }
+  .stop {
+    width: 46px;
+  }
+  .dot {
+    width: 14px;
+    height: 14px;
+    border-width: 2px;
+  }
+  .trail {
+    margin-top: 6px;
+  }
+  .results {
+    font-size: 12px;
+    line-height: 1.3;
+  }
+}
+
+/* Pill buttons on a darker offset layer (UI_DIRECTION.md §6). Primary = gold with ink text; the rest are navy.
+   Presses squash a little, then spring back. */
+.buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding-bottom: 4px;
+}
+.button {
+  min-height: 44px;
+  padding: 4px 22px;
+  border: 2px solid transparent;
+  border-radius: var(--pill);
+  background: var(--panel);
+  box-shadow: 0 4px 0 var(--panel-deep);
+  color: var(--cream);
+  font: 700 16px "Baloo 2", system-ui, sans-serif;
   cursor: pointer;
+  transition:
+    transform var(--t-fast) var(--spring),
+    box-shadow var(--t-fast) var(--spring),
+    opacity var(--t-fast) var(--ease-out);
+}
+.button.primary {
+  background: var(--gold);
+  box-shadow: 0 4px 0 var(--gold-deep);
+  color: var(--ink);
+}
+.button:hover {
+  transform: translateY(-2px);
+}
+.button:focus-visible {
+  outline: 3px dashed var(--cream);
+  outline-offset: 2px;
+}
+.button:active {
+  transform: translateY(3px) scale(0.96);
+  box-shadow: 0 1px 0 var(--panel-deep);
+}
+.button.primary:active {
+  box-shadow: 0 1px 0 var(--gold-deep);
+}
+.button:disabled {
+  opacity: 0.45;
+  cursor: default;
+  transform: none;
+}
+
+/* Reduced motion: cards, panels and the Big Moment fade in instead of springing (no confetti either). */
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .sheet,
+  .moment,
+  .moment-badge {
+    animation-name: fade-in;
+  }
+  .moment-time.landed {
+    animation: none;
+  }
+  .stop.now .dot {
+    animation: none;
+  }
+}
+
+/* ---------- The running-track touches ---------- */
+
+/* A little track bend in the bottom-right corner of cards and panels: red lanes with white lines,
+   curving around the corner like the end of the oval. */
+.card::after,
+.sheet::after,
+.moment::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  width: 110px;
+  height: 110px;
+  border-bottom-right-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 0 0,
+    transparent 0 113px,
+    #fff 113px 115px,
+    var(--track) 115px 124px,
+    #fff 124px 125.5px,
+    var(--track) 125.5px 134px,
+    #fff 134px 135.5px,
+    var(--track) 135.5px 144px,
+    #fff 144px 145.5px,
+    var(--track) 145.5px
+  );
+}
+.sheet,
+.moment {
+  position: relative;
+  isolation: isolate;
+}
+.moment::after {
+  border-bottom-right-radius: 22px;
+}
+
+/* The glossary on the "How stats work" panel. */
+.glossary {
+  width: 100%;
+  display: grid;
+  gap: 6px;
+}
+.glossary-row {
+  display: grid;
+  grid-template-columns: 7.5em 1fr;
+  gap: 10px;
+  align-items: baseline;
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: var(--panel-deep);
+}
+.glossary-name {
+  color: var(--gold);
+  font-weight: 800;
+}
+.glossary-text {
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+/* The kick ring is a little track: two lanes with white lines, and a white start line at the top. */
+.ring .ring-lane {
+  stroke: #fff;
+  stroke-width: 1.4;
+  opacity: 0.9;
+}
+.ring-start {
+  fill: #fff;
+}
+
+@media (max-height: 500px) {
+  .glossary {
+    grid-template-columns: 1fr 1fr;
+  }
+  .glossary-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+    padding: 4px 10px;
+  }
+  .glossary-text {
+    font-size: 12px;
+  }
+}
+
+/* Very small sideways phones: no room for the card icon next to the type chip, the ? and the lane number.
+   The chip's color still shows the card type. */
+@media (max-height: 500px) and (max-width: 760px) {
+  .card-icon {
+    display: none;
+  }
+}
+
+/* The camera button, just above the kick button: switches between the stadium view and the race camera.
+   Cream while the race camera is on. */
+.camera-button {
+  position: absolute;
+  right: calc(var(--gap) + 40px);
+  bottom: calc(var(--gap-bottom) + 134px);
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--panel);
+  box-shadow: 0 4px 0 var(--panel-deep);
+  pointer-events: auto;
+  cursor: pointer;
+  --icon-base: var(--cream);
+  --icon-facet: var(--cream-shade);
+  --icon-line: var(--panel-deep);
+  transition:
+    transform var(--t-fast) var(--spring),
+    box-shadow var(--t-fast) var(--spring),
+    background var(--t-fast) var(--ease-out);
+}
+.camera-button .icon {
+  width: 28px;
+  height: 28px;
+  filter: none;
+}
+.camera-button:active {
+  transform: translateY(3px) scale(0.94);
+  box-shadow: 0 1px 0 var(--panel-deep);
+}
+.camera-button.on {
+  background: var(--cream);
+  box-shadow: 0 4px 0 var(--cream-deep);
+  --icon-base: var(--panel);
+  --icon-facet: var(--panel-deep);
+  --icon-line: var(--panel-deep);
+}
+@media (max-height: 500px) {
+  .camera-button {
+    right: calc(var(--gap) + 34px);
+    bottom: calc(var(--gap-bottom) + 120px);
+    width: 42px;
+    height: 42px;
+  }
+}
+
+/* Tapping a tag in the race display pops up a small card above them to reread it. Tap it (or anywhere) to close. */
+.tag:active {
+  transform: scale(0.94);
+}
+.tag.open {
+  border-color: var(--cream);
+}
+.tag-card.open {
+  border-color: var(--panel);
+}
+.peek {
+  --cat: var(--panel);
+  --cat-text: var(--cream);
+  width: min(240px, 36vw);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px 8px;
+  border-radius: 14px;
+  background: var(--cream);
+  box-shadow: 0 5px 0 var(--cream-deep), 0 10px 18px rgba(18, 26, 52, 0.3);
+  color: var(--ink);
+  pointer-events: auto;
+  cursor: pointer;
+  transform-origin: bottom left;
+  animation: pop var(--t-med) var(--spring);
+}
+.peek[hidden] {
+  display: none;
+}
+.peek .card-icon {
+  position: static; /* not the phone-size card-pick placement */
+  display: block;
+  margin: 0;
+}
+.peek .card-icon .icon {
+  width: 26px;
+  height: 26px;
+}
+.peek-name {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+.peek-text {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+.peek-close {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.5;
+}
+@media (prefers-reduced-motion: reduce) {
+  .peek {
+    animation-name: fade-in;
+  }
+}
+
+/* ---------- Rare cards ---------- */
+
+/* Rare cards (Unique and Rivalry) get a lavender "foil" edge with a soft shine that sweeps across now and then,
+   and a small badge. Gold stays for kicking and for the card you've picked. */
+.card.rare,
+.peek.rare {
+  border: 3px solid #b39cd0;
+  box-shadow: 0 6px 0 #8d77ad, 0 0 0 3px rgba(179, 156, 208, 0.35), 0 12px 22px rgba(18, 26, 52, 0.25);
+}
+.card.rare.picked {
+  border-color: var(--gold);
+}
+.card.rare::before,
+.peek.rare::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.55) 50%, transparent 62%);
+  background-size: 300% 100%;
+  background-position: 120% 0;
+  animation: sheen 3.6s ease-in-out infinite;
+}
+.peek.rare {
+  position: relative;
+}
+@keyframes sheen {
+  0%,
+  55% {
+    background-position: 120% 0;
+  }
+  100% {
+    background-position: -20% 0;
+  }
+}
+.card-badge {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: var(--pill);
+  background: #b39cd0;
+  box-shadow: 0 2px 0 #8d77ad;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.rivalry .card-badge {
+  background: var(--track);
+  box-shadow: 0 2px 0 #7d332d;
+  color: #fff;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card.rare::before,
+  .peek.rare::before {
+    animation: none;
+  }
+}
+
+/* The speaker button: on every screen, top right (just under your place during races). Turns all sound on or off. */
+.speaker-button {
+  position: fixed;
+  top: calc(var(--gap-top) + 96px);
+  right: var(--gap);
+  z-index: 30; /* above the menus too */
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--panel);
+  box-shadow: 0 4px 0 var(--panel-deep);
+  cursor: pointer;
+  --icon-base: var(--cream);
+  --icon-facet: var(--cream-shade);
+  --icon-line: var(--cream);
+  transition:
+    transform var(--t-fast) var(--spring),
+    box-shadow var(--t-fast) var(--spring),
+    opacity var(--t-fast) var(--ease-out);
+}
+.speaker-button .icon {
+  width: 26px;
+  height: 26px;
+  filter: none;
+}
+.speaker-button:active {
+  transform: translateY(3px) scale(0.94);
+  box-shadow: 0 1px 0 var(--panel-deep);
+}
+.speaker-button.off {
+  opacity: 0.75;
+}
+@media (max-height: 500px) {
+  .speaker-button {
+    top: calc(var(--gap-top) + 84px);
+    width: 38px;
+    height: 38px;
+  }
 }

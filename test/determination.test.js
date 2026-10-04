@@ -12,9 +12,26 @@ const zeroPoints = { speed: 0, topSpeed: 0, stamina: 0, kick: 0, determination: 
 const sprinter = (determination) =>
   buildRunner("Test", { ...zeroPoints, speed: 25, topSpeed: 25, raceIQ: 50, determination });
 
-test("bonus is 5 stamina plus 0.6 per Determination point", () => {
+test("bonus is 5 stamina plus 0.4 per Determination point", () => {
   assert.equal(determinationBonus(buildRunner("Test", zeroPoints)), 5);
-  assert.equal(determinationBonus(buildRunner("Test", { ...zeroPoints, determination: 30 })), 23);
+  assert.equal(determinationBonus(buildRunner("Test", { ...zeroPoints, determination: 30 })), 17);
+});
+
+test("Determination rolls once per lap, so 35 Determination really is about a 35% chance", () => {
+  // Count the Determination rolls (the only 35% chance in a solo race): at most one per lap, about 35% succeed.
+  let successes = 0;
+  let rolls = 0;
+  for (let seed = 1; seed <= 300; seed++) {
+    const rng = createRandom(seed);
+    let rollsThisRace = 0;
+    const counting = { ...rng, chance: (p) => (p === 0.35 && rollsThisRace++, rng.chance(p)) };
+    const result = runSolo(sprinter(35), counting, PLANS.fastStart);
+    assert.ok(rollsThisRace <= 4, `seed ${seed}: ${rollsThisRace} rolls in a 4-lap race`);
+    successes += result.events.length;
+    rolls += rollsThisRace;
+  }
+  const rate = successes / rolls;
+  assert.ok(rate > 0.28 && rate < 0.42, `success rate per roll was ${(rate * 100).toFixed(0)}%`);
 });
 
 test("0 Determination never succeeds, 100 or more always does", () => {

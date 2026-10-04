@@ -28,6 +28,15 @@ export function isRare(card) {
   return card.type === "Unique" || card.rivalryOnly === true;
 }
 
+// The CSS classes and badge for showing a card: its type color, plus a "foil" look and a badge for rare cards.
+export function cardLook(card) {
+  const rare = isRare(card);
+  return {
+    className: `type-${card.type.toLowerCase()}${rare ? " rare" : ""}${card.rivalryOnly ? " rivalry" : ""}`,
+    badge: card.rivalryOnly ? "Rivalry" : rare ? "Rare" : null,
+  };
+}
+
 // --- Helpers for counting what's happened since a card was picked ---
 
 function passesMadeSince(race, you, time) {

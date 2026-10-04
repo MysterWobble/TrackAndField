@@ -1,8 +1,8 @@
 // Determination: the chance to dig deep and find a little more energy when you're nearly empty.
 //
-// While a runner's stamina is low, the race rolls for Determination every few seconds.
+// The first time each lap a runner's stamina is low, the race rolls for Determination once.
 // The chance of success is their Determination as a percent (30 = 30%, 100 or more = always).
-// A success gives back 5 stamina, plus 1 more for every 10 Determination.
+// A success gives back 5 stamina, plus 4 more for every 10 Determination (data/tuning.js).
 //
 // The race loop (race.js) decides WHEN to roll. This file only answers "did it work, and how much?"
 
